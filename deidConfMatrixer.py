@@ -49,10 +49,16 @@ def magicsplit(l, *splitters):
 docCount=0
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
 
+truePosCount = 0
+falseNegCount = 0
+falsePosCount = 0
+
 for doc in docs:
     if not doc.endswith('.out.xml'):
         docCount += 1
-        print "Now parsing document %s out of %s...\n\n" % (docCount, len(docs)/2)
+        print "\n\n_______________________________________\n"
+        print "Now parsing document %s out of %s..." % (docCount, len(docs)/2)
+        print "_______________________________________\n\n"
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngineDoc = parse(findPair(path + '\\' + doc))                   
         gsCodes = []
@@ -63,17 +69,16 @@ for doc in docs:
         finalGSDic = {}
         gsParent = []
 
+        
         ##    
         ## Establishing the gold standard data structures
         ##
 
         ##  assmpt for now -- will throw a test in later: the gold standard set is perfect & 1:1 ###
-            
         gsCodeNodes = parsedGSDoc.getElementsByTagName('mm:code') #code node
         for node in gsCodeNodes:
             gsCodes.append(node.getAttribute('code'))
             ### codes just looks like a list of all the codes in order of mim appearance ###
-
         gsParent = parsedGSDoc.getElementsByTagName('mm:binding') #code's sister 'mm:binding' node
         for item in gsParent:
             for child in item.getElementsByTagName('mm:narrativeBinding'):
@@ -82,21 +87,16 @@ for doc in docs:
             gsEntryNums.append('\n')
         del gsEntryNums[-1]
         ### all the tokenization ref nums associated with the codes ###
-
         gsEntryNumsGrouped = magicsplit(gsEntryNums, '\n')
         gsEntryNumsGroupedTuple = tuple(tuple(x) for x in gsEntryNumsGrouped)
             ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) ###
             ### Helpful because you can see the scoping of a certain mim ... len(gsEntryNumsGroupedTuple[1]) -> 3 (tokens long) ###
-
         goldWorkingData = zip(gsEntryNumsGroupedTuple, gsCodes)
         gsWorkingData = tuple(goldWorkingData)
             ### which looks like ((('entry_102'), 'LAST_NAME'), (('entry_7', 'entry_8', 'entry_9'), 'AGE') ...) ###
-
         ##print "This is what gsWorkingData looks like: \n\n"
         ##print gsWorkingData
         ##print "\n\n"
-            
-
         for entry in gsEntryNumsOnly:
             for i in range(len(gsWorkingData)):
                 if entry in gsWorkingData[i][0]:
@@ -108,24 +108,19 @@ for doc in docs:
         ##print "This is what gsDic1 looks like: \n\n"
         ##print gsDic1
         ##print "\n\n"
-
-
         contentNodes = parsedGSDoc.getElementsByTagName('content')
         for node in contentNodes:
             text = node.childNodes
             for node in text:
                 if node.parentNode.getAttribute('ID') in gsDic1:
                     gsDic2[node.parentNode.getAttribute('ID')] = node.data
-
         ##print "This is what gsDic2 looks like: \n\n"
         ##print gsDic2
         ##print "\n\n"
-
         for entry in gsEntryNumsOnly:
                 for i in range(len(gsWorkingData)):
                         if entry in gsWorkingData[i][0] and entry in gsDic2:
                                 finalGSDic[entry] = ((gsWorkingData[i][1], gsDic2[entry]))
-
         ##print "This is what finalGSDic looks like: \n\n"
         ##print finalGSDic
         ##print "\n\n"
@@ -133,12 +128,10 @@ for doc in docs:
         ##
         ## Establishing the engine data structures
         ##
-
         engineCodes = []
         engineEntryNumsOnly = []
         engineEntryNums = []
         engineParent = []
-
         engineCodeNodes = parsedEngineDoc.getElementsByTagName('mm:code')
         for node in engineCodeNodes:
             engineCodes.append(node.getAttribute('code'))
@@ -179,6 +172,7 @@ for doc in docs:
         #
         truePositives = list(engineSet.intersection(gsSet))
         print "True Positives: (x%s found!)\n" % len(truePositives)
+        truePosCount += len(truePositives)
         print truePositives
 
         #
@@ -198,9 +192,11 @@ for doc in docs:
         print "_____________________________________________\n"
 
         print "In gold standard version but not in engine version (false negatives): (x%s found)" % len(gsDiffs)
+        falseNegCount += len(gsDiffs)
         print gsDiffs
         print ""
-        print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engineDiffs) 
+        print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engineDiffs)
+        falsePosCount += len(engineDiffs)
         print engineDiffs
         print "\n\n"
         ### engineDiffs will contain false positives, scopeMismatchValueMatches, and ScopeMatchValueMismatch
@@ -290,7 +286,20 @@ for doc in docs:
 ##print '\nConfusion matrix successfully generated.'
 ##print '\nAll files successfuly written to ' + gsPath
 
-print 'Took', datetime.datetime.now()-startTime, 'to run files.'
+print 'Took', datetime.datetime.now()-startTime, 'to run %s files.\n\n' % (len(docs)/2)
+
+print 'Totals'
+print 'True Positives: ' + str(truePosCount)
+print 'False Negatives: ' + str(falseNegCount)
+print 'False Positives: ' + str(falsePosCount)
+
+
+
+
+
+
+
+
 
 
 ## Wikipedia confusion table code
