@@ -122,7 +122,7 @@ for file in xmls:
                 bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
 ##                print bindings
                 Entries = ', '.join([str(binding) for binding in bindings])
-                Value = str([child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'])
+                Value = str([child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code']) # added if filter here, because why would we need the manual validation codes? 
                 mimdict[Entries] = Value
     allmims[file] = mimdict
     print "allmims:"
