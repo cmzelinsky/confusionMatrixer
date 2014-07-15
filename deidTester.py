@@ -7,10 +7,10 @@
 #Also generates reports on each individual confusion
 
 
-import datetime, operator, os, pickle, sys, xml.dom.minidom as minidom
+import datetime, operator, os, pickle, sys, libxml2, py-dom-xpath, xml.dom.minidom as minidom
 import xml.etree.ElementTree
 startTime = datetime.datetime.now()
-path = 'C:/Users/courtney.zelinsky/Desktop'
+path = 'C:/Users/courtney.zelinsky/Desktop/test'
 if not os.path.exists(path):
     raise Exception('Invalid path')
 
@@ -30,8 +30,8 @@ def Round(Float):
 def getTotal(attr):
     return sum([int(v.firstChild.nodeValue) for v in doc.getElementsByTagName('Engine') if v.getAttribute('count') == attr])
 
-def listCompare(l1, l2):
-    return filter(lambda x: x not in list(l1), list(l2))
+##def listCompare(l1, l2):
+##    return filter(lambda x: x not in list(l1), list(l2))
 
 def getText(fname, entries):
     entries = entries.split(', ')
@@ -40,7 +40,7 @@ def getText(fname, entries):
     para = []
     separator = '::::'
     for entry in entries:
-        concept.append(xpath.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
+        concept.append(doc.xpath.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
     concept = ''.join(concept)[:-1]
     for w in xpath.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
         if w.getAttribute('ID') in entries:
@@ -128,7 +128,6 @@ for file in xmls:
     print "allmims:"
     print allmims
     sys.stdout.write(' Done!\n\n\n')
-
 
 
 for File in allmims:
