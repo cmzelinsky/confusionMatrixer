@@ -16,7 +16,7 @@ import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys
 from xml.dom.minidom import parse
 startTime = datetime.datetime.now()
 ##args = sys.argv
-path = "C:\Users\courtney.zelinsky\Desktop\deid"
+path = "C:/Users/courtney.zelinsky/Desktop/deid"
 
 if not os.path.exists(path):
     raise Exception('Invalid path(s)')
@@ -49,6 +49,7 @@ def magicsplit(l, *splitters):
 docCount=0
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
 
+allData = {}
 truePosCount = 0
 falseNegCount = 0
 falsePosCount = 0
@@ -69,7 +70,6 @@ for doc in docs:
         finalGSDic = {}
         gsParent = []
 
-        
         ##    
         ## Establishing the gold standard data structures
         ##
@@ -89,41 +89,29 @@ for doc in docs:
         ### all the tokenization ref nums associated with the codes ###
         gsEntryNumsGrouped = magicsplit(gsEntryNums, '\n')
         gsEntryNumsGroupedTuple = tuple(tuple(x) for x in gsEntryNumsGrouped)
-            ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) ###
-            ### Helpful because you can see the scoping of a certain mim ... len(gsEntryNumsGroupedTuple[1]) -> 3 (tokens long) ###
-        goldWorkingData = zip(gsEntryNumsGroupedTuple, gsCodes)
-        gsWorkingData = tuple(goldWorkingData)
-            ### which looks like ((('entry_102'), 'LAST_NAME'), (('entry_7', 'entry_8', 'entry_9'), 'AGE') ...) ###
-        ##print "This is what gsWorkingData looks like: \n\n"
-        ##print gsWorkingData
-        ##print "\n\n"
-        for entry in gsEntryNumsOnly:
-            for i in range(len(gsWorkingData)):
-                if entry in gsWorkingData[i][0]:
-                # questioning if this line will be problematic for some test cases...
-                # if an entry number appears twice (meaning, if the gold standard isn't perfect and has overlapping entries), i'll need to create a test for the engine output later
-                    gsDic1[entry] = gsWorkingData[i][1]
-            # which looks like {'entry_217' : 'DATE', 'entry_216': 'DATE', 'entry_36': 'DATE', 'entry_274': 'LAST_NAME' ...}
+        ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) ###
 
-        ##print "This is what gsDic1 looks like: \n\n"
-        ##print gsDic1
-        ##print "\n\n"
+        gsDic = dict(zip(gsEntryNumsGroupedTuple, gsCodes))
+        # if an entry number appears twice (if the gold standard isn't perfect + has overlapping entries),
+        #  i'll need to create a test for the engine output later
+        # gsDic1[entry] = gsWorkingData[i][1]
+        # which looks like {'entry_217' : 'DATE', 'entry_216': 'DATE', 'entry_36': 'DATE', 'entry_274': 'LAST_NAME' ...}
+
         contentNodes = parsedGSDoc.getElementsByTagName('content')
         for node in contentNodes:
             text = node.childNodes
             for node in text:
                 if node.parentNode.getAttribute('ID') in gsDic1:
                     gsDic2[node.parentNode.getAttribute('ID')] = node.data
-        ##print "This is what gsDic2 looks like: \n\n"
-        ##print gsDic2
-        ##print "\n\n"
-        for entry in gsEntryNumsOnly:
-                for i in range(len(gsWorkingData)):
-                        if entry in gsWorkingData[i][0] and entry in gsDic2:
-                                finalGSDic[entry] = ((gsWorkingData[i][1], gsDic2[entry]))
-        ##print "This is what finalGSDic looks like: \n\n"
-        ##print finalGSDic
-        ##print "\n\n"
+        # {u'entry_202': u'January', u'entry_203': u'2012.', u'entry_303': u"Jude's", u'entry_302': u'St.'...}
+        
+        ##for entry in gsEntryNumsOnly:
+        ##    for i in range(len(gsWorkingData)):
+        ##      if entry in gsWorkingData[i][0] and entry in gsDic2:
+        ##          finalGSDic[entry] = ((gsWorkingData[i][1], gsDic2[entry]))
+
+        # Don't really even need this if I can get the xpath module working ^^^
+
 
         ##
         ## Establishing the engine data structures
@@ -150,31 +138,19 @@ for doc in docs:
             ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...] ###
             ### Helpful because you can see the scoping of a certain mim ... len(entryNumsGrouped[1]) -> 3 (tokens long) ###
 
-        engWorkingData = zip(engineEntryNumsGroupedTuple, engineCodes)
-        engineWorkingData = tuple(engWorkingData)
-            ### which looks like [(['entry_102'], 'LAST_NAME'), (['entry_7', 'entry_8', 'entry_9'], 'AGE') ...] ###
-
-        ##print "This is what engineWorkingData looks like"
-        ##print engineWorkingData
-        ##print "\n\n"
-
+        engDic = dict(zip(engineEntryNumsGroupedTuple, engineCodes))
 
         ##
         ## Begin comparison of data structures
         ##
 
-        gsSet = set(gsWorkingData)
-
-        engineSet = set(engineWorkingData)
-
         #
         # True Positives
         #
-        truePositives = list(engineSet.intersection(gsSet))
+        truePositives = {x:gsDic[x] for x in gsDic if x in engDic}
         print "True Positives: (x%s found!)\n" % len(truePositives)
         truePosCount += len(truePositives)
         print truePositives
-
         #
         # Checking for false positives, false negatives, and mismatches...
         #
@@ -222,7 +198,8 @@ for doc in docs:
         # Checking for scope match, value mismatch (Same entry number, different code value):
         #
 
-        print "\n\nScope Match - Value Mismatch MIMs:\n"
+        print "\n\nScope Match - Value Mismatch MIMs:"
+        print "_____________________________________________\n"
 
         scopeMatchValueMismatch = []
         for i in range(len(engineDiffsList)):
@@ -233,7 +210,7 @@ for doc in docs:
 
         print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
         print scopeMatchValueMismatch
-        print "\n\n\n"
+        print "\n"
 
         outputList = []
         documentText = {}
@@ -249,28 +226,14 @@ for doc in docs:
             for node in text:
                 documentText[node.parentNode.getAttribute('ID')] = node.data
 
-### ignoring this for now, have a better solution ###
-                
-##                
-##        entryNum = entryJustNumsList[0]
-##        startVariable = filter(lambda x: 
-##        for i in range((int(entryNum)-10), (int(entryNum)+10)):
-##            iterEntryNum = "entry_" + str(i)
-##            print iterEntryNum
-##            outputList.append(documentText[iterEntryNum])
-##                            
-##        outputString = "..." + " ".join(outputList) + "..."
-##        print outputString
-
-        # output this as html later with bolded / js tooltip functionality :)
-
 
         # Checking for scope mismatch, value match (Overlapping entry numbers, same code value)
         #
         # Test cases: "in October" vs "October" for DATE, "on October 21 1993" and "October 21 1993" as ABSOLUTE_DATE
         # --> entry is in tuple but engine result tuple and gs tuple are different lengths
 
-        print "\n\nScope Mismatch - Value Match MIMs:\n"
+        print "\n\nScope Mismatch - Value Match MIMs:"
+        print "_____________________________________________\n"
 
         scopeMismatchValueMatch = []
         for i in range(len(gsWorkingData)):
@@ -365,7 +328,7 @@ with open(os.path.join(path, 'confusionMatrixForDeid.html'), 'w') as out:
     out.write("""
                         </table>
                     </div>
-                    <p style="text-align:center; font-size:12px"> Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script </p>
+                    <p style="text-align:center; font-size:12px"> Email cmzelinsky@gmail.com for questions / comments / suggestions for this script </p>
                 </body>
             </html> """)
     

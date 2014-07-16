@@ -7,7 +7,7 @@
 #Also generates reports on each individual confusion
 
 
-import datetime, operator, os, pickle, sys, libxml2, py-dom-xpath, xml.dom.minidom as minidom
+import datetime, operator, os, pickle, sys, libxml2, xml.dom.minidom as minidom
 import xml.etree.ElementTree
 startTime = datetime.datetime.now()
 path = 'C:/Users/courtney.zelinsky/Desktop/test'
