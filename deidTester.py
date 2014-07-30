@@ -9,6 +9,7 @@
 
 import datetime, operator, os, pickle, sys, libxml2, xml.dom.minidom as minidom
 import xml.etree.ElementTree
+import xml.etree.ElementTree as ET
 startTime = datetime.datetime.now()
 path = 'C:/Users/courtney.zelinsky/Desktop/test'
 if not os.path.exists(path):
@@ -36,13 +37,14 @@ def getTotal(attr):
 def getText(fname, entries):
     entries = entries.split(', ')
     doc = minidom.parse(path + '\\' + fname)
+    docTemp = ET.parse(path + '\\' + fname)
     concept = []
     para = []
     separator = '::::'
     for entry in entries:
-        concept.append(doc.xpath.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
+        concept.append(docTemp.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
     concept = ''.join(concept)[:-1]
-    for w in xpath.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
+    for w in docTemp.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
         if w.getAttribute('ID') in entries:
             if not w.firstChild.localName == 'hit':
                 para.append('<font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>')
@@ -100,7 +102,6 @@ def errorAnalysis(gs, eng):
             out.write('</table>\n')
             out.write('</body>\n')
             out.write('</html>')
-
 tp = {}
 errors = {}
 allmims = {}
@@ -171,7 +172,9 @@ for i in tp:
 
 print '\n\nPerforming error analysis...\n'
 currentdi = {}
-vals = {'LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE', 'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_CODE_NUMBER', 'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'HOSPITAL', 'TIME', 'OTHER'}
+vals = {'LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE', 'ADDRESS',
+        'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_CODE_NUMBER', 'NAME', 'ORGANIZATION',
+        'URL', 'E_MAIL_ADDRESS', 'HOSPITAL', 'TIME', 'OTHER'}
 with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
     out.write('<html><head><title>Confusion Matrix</title></head><body>')
     out.write('<h4>Generated at: ' + str(datetime.datetime.now()).split('.')[0] + '</h4>')
