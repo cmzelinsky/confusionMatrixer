@@ -34,39 +34,39 @@ def getTotal(attr):
 ##def listCompare(l1, l2):
 ##    return filter(lambda x: x not in list(l1), list(l2))
 
-def getText(fname, entries):
-    entries = entries.split(', ')
-    doc = minidom.parse(path + '\\' + fname)
-    docTemp = ET.parse(path + '\\' + fname)
-    concept = []
-    para = []
-    separator = '::::'
-    for entry in entries:
-        concept.append(docTemp.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
-    concept = ''.join(concept)[:-1]
-    for w in docTemp.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
-        if w.getAttribute('ID') in entries:
-            if not w.firstChild.localName == 'hit':
-                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>')
-            else:
-                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.firstChild.nodeValue + '</strong></font>')
-        else:
-            if not w.firstChild.localName == 'hit':
-                para.append(w.firstChild.nodeValue)
-            else:
-                para.append(w.firstChild.firstChild.nodeValue)
-    para = '<span onclick="showHide(this)" style="cursor:pointer">Context <span class="plusMinus">[+]</span></span><br><span style="display:none">' + ''.join(para) + '</span>'
-    return fname + separator + concept + separator + para
+##def getText(fname, entries):
+##    entries = entries.split(', ')
+##    doc = minidom.parse(path + '\\' + fname)
+##    docTemp = ET.parse(path + '\\' + fname)
+##    concept = []
+##    para = []
+##    separator = '::::'
+##    for entry in entries:
+##        concept.append(docTemp.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
+##    concept = ''.join(concept)[:-1]
+##    for w in docTemp.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
+##        if w.getAttribute('ID') in entries:
+##            if not w.firstChild.localName == 'hit':
+##                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>')
+##            else:
+##                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.firstChild.nodeValue + '</strong></font>')
+##        else:
+##            if not w.firstChild.localName == 'hit':
+##                para.append(w.firstChild.nodeValue)
+##            else:
+##                para.append(w.firstChild.firstChild.nodeValue)
+##    para = '<span onclick="showHide(this)" style="cursor:pointer">Context <span class="plusMinus">[+]</span></span><br><span style="display:none">' + ''.join(para) + '</span>'
+##    return fname + separator + concept + separator + para
 
-def errorAnalysis(gs, eng):
-    allmims = pickle.load(open(os.path.join(path, 'allmims.txt')))
-    flen = str(len(allmims)/2)
-    errors = []
-    for file in allmims:
-        if not '.out' in file:
-            for entry in allmims[file]:
-                if entry in allmims[findPair(file)] and allmims[file][entry] == gs and allmims[findPair(file)][entry] == eng:
-                    errors.append(getText(file, entry))
+##def errorAnalysis(gs, eng):
+##    allmims = pickle.load(open(os.path.join(path, 'allmims.txt')))
+##    flen = str(len(allmims)/2)
+##    errors = []
+##    for file in allmims:
+##        if not '.out' in file:
+##            for entry in allmims[file]:
+##                if entry in allmims[findPair(file)] and allmims[file][entry] == gs and allmims[findPair(file)][entry] == eng:
+##                    errors.append(getText(file, entry))
     if errors:
         with open(os.path.join(path, gs + ' x ' + eng + '.html'), 'w') as out:
             sys.stdout.write('(' + os.path.basename(out.name) + ')')
@@ -252,15 +252,15 @@ with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
     sys.stdout.write('\nDumping the allmims object to file for future reuse...')
     pickle.dump(allmims, open(path + '\\allmims.txt', 'w'))
     sys.stdout.write(' Done!\n\n')
-    for i in getResults(errors):
-        docnum += 1
-        sys.stdout.write('Creating error file ' + str(docnum) + ' out of ' + errorlen + '... ')
-        errorAnalysis(i[0][0], i[0][1])
-        if  i[1] == 1:
-            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' time.</li>')
-        else:
-            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' times.</li>')
-        sys.stdout.write(' Done!\n')
+##    for i in getResults(errors):
+##        docnum += 1
+##        sys.stdout.write('Creating error file ' + str(docnum) + ' out of ' + errorlen + '... ')
+##        errorAnalysis(i[0][0], i[0][1])
+##        if  i[1] == 1:
+##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' time.</li>')
+##        else:
+##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' times.</li>')
+##        sys.stdout.write(' Done!\n')
     out.write('</ul>')
     out.write('</body>')
     out.write('</html>')
