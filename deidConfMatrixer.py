@@ -14,7 +14,12 @@ import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
+from xml.dom import minidom
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ElementTree
+from xml.etree.ElementTree import Element, tostring, SubElement, XML
+
+
 startTime = datetime.datetime.now()
 ##args = sys.argv
 path = "C:/Users/courtney.zelinsky/Desktop/deid"
@@ -178,6 +183,8 @@ for doc in docs:
             # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
             elif gsDic[x] != engDic[x]:
                 confusionMatrix[gsDic[x]][engDic[x]] += 1
+
+                
         # Increments false negative count
         # Checks whether entries that exist in the gold standard exist in the engine
         # If not, it's a false negative
@@ -311,31 +318,14 @@ print 'True Positives: ' + str(truePosCount)
 print 'False Negatives: ' + str(falseNegCount)
 print 'False Positives: ' + str(falsePosCount)
 
-## Wikipedia confusion table code
-def confusion_table(cfm, label):
-    """Returns a confusion table in the following format:
-    [[true positives, false negatives],
-     [false positives, true negatives]]
-    for the given label index in the confusion matrix.
-    """
-    predicted = cfm[label]
-    actual    = [cfm[i][label] for i in range(len(cfm))]
-    true_pos  = predicted[label]
-    false_pos = sum(actual) - true_pos
-    false_neg = sum(predicted) - true_pos
-    total     = sum([sum(i) for i in cfm])
-    true_neg  = total - true_pos - false_pos - false_neg
- 
-    return [[true_pos, false_neg],
-            [false_pos, true_neg]]
 
 #
 # HTML Output
 #
 
-vals = ['LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE',
-        'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_OTHER_CODE',
-        'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'TIME', 'OTHER']
+##vals = ['LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE',
+##        'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_OTHER_CODE',
+##        'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'TIME', 'OTHER']
  
 with open(os.path.join(path, 'confusionMatrixForDeid.html'), 'w') as out:
     out.write("""<html>
@@ -357,135 +347,172 @@ with open(os.path.join(path, 'confusionMatrixForDeid.html'), 'w') as out:
     out.write('<h3>Total Engine MIMs: ' + str(len(engDic)) + '</h3></td></tr></table>')
 
 
-currentdi = {}
-vals = {'LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE', 'ADDRESS',
-        'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_CODE_NUMBER', 'NAME', 'ORGANIZATION',
-        'URL', 'E_MAIL_ADDRESS', 'HOSPITAL', 'TIME', 'OTHER'}
-with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
-    out.write('<html><head><title>Confusion Matrix</title></head><body>')
-    out.write('<h4>Generated at: ' + str(datetime.datetime.now()).split('.')[0] + '</h4>')
-    out.write('<table border = "1"><th>gold/system</th><th>' + '</th><th>'.join(vals) + '</th><th>Sum</th><th>Micro-recall</th>')
-    doc = minidom.Document()
-    matrix = doc.createElement('Matrix')
-    doc.appendChild(matrix)
-    for var in vals:
-        Gs = doc.createElement('goldStandard')
-        attr = doc.createAttribute('count')
-        Gs.setAttributeNode(attr)
-        Gs.setAttribute('count', var)
-        matrix.appendChild(Gs)
-        out.write('<tr><th>' + var + '</th>')
-        total = []
-        for val in vals:
-            Eng = doc.createElement('Engine')
-            attr = doc.createAttribute('count')
-            Eng.setAttributeNode(attr)
-            Eng.setAttribute('count', val)
-            print str(confusionMatrix[val]) + "confusion matrix val here!!!"
-            if confusionMatrix[val] not in confusionMatrix.keys():
-                value = doc.createTextNode(str(confusionMatrix[val][val]))
-            else:
-                value = doc.createTextNode('0')
-            Eng.appendChild(value)
-            Gs.appendChild(Eng)
-            if val == var and not value.nodeValue == '0':
-                current = value.nodeValue
-                currentdi[val] = current
-                out.write('<td bgcolor="#00CC33">' + value.nodeValue + '</td>')
-            elif value.nodeValue == '0':
-                out.write('<td bgcolor="#FFCC33">' + value.nodeValue + '</td>')
-            else:
-                out.write('<td bgcolor="#CC0000">' + value.nodeValue + '</td>')
-            total.append(value.nodeValue)
-        Summ = doc.createElement('sum')
-        Sum = doc.createTextNode(str(sum([int(v) for v in total])))
-        Summ.appendChild(Sum)
-        Gs.appendChild(Summ)
-        microrec = doc.createElement('Microrecall')
-        try:
-            mr = doc.createTextNode(str(Round(float(current)/float(Sum.nodeValue))))
-        except:
-            mr = doc.createTextNode('N/A')
-        microrec.appendChild(mr)
-        out.write('<td>' + Sum.nodeValue + '</td><td>' + mr.nodeValue + '</td</tr>')
-    out.write('<tr><th>Sum</th><td>')
-    Totals = []
-    for var in vals:
-        Totals.append(str(getTotal(var)))
-    out.write('</td><td>'.join(Totals) + '</td></tr>')
-    out.write('<tr><th>Micro-precision</th>')
-    for var in vals:
-        if not var in currentdi.keys():
-            currentdi[var] = 0
-        for i in currentdi:
-            if i == var:
-                try:
-                    out.write('<td>' + str(Round((float(currentdi[i])/getTotal(var)))))
-                except ZeroDivisionError:
-                    out.write('<td>N/A')
-    out.write('</td></tr></table>')
-    out.write('<h4>Total correct: ' + str(sum(int(i) for i in currentdi.values())) + '</h4>')
-    out.write('<h4>Total errors: ' + str(sum(errors.values())) + '</h4>')
-    out.write('<h4>Total MIMs: ' + str(sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')])) + '</h4>')
-##    out.write('<h4>Accuracy: ' + str(Round(float(sum(int(i) for i in currentdi.values()))/sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')]))))
-    out.write('<h4>Number of documents: ' + str(numFiles/2) + '</h4>')
-    out.write('<h3>List view:</h3>')
-    out.write('<h4>True Positives:</h4><ul>')
-    for i in getResults(tp):
-        out.write('<li>' + i[0] + ' correctly identified as such ' + str(i[1]) + ' times.</li>')
-    out.write('</ul><h4>Errors:</h4><ul>')
-    errorlen = str(len(errors))
-    docnum = 0
-    sys.stdout.write('\nDumping the allmims object to file for future reuse...')
-    pickle.dump(allmims, open(path + '\\allmims.txt', 'w'))
-    sys.stdout.write(' Done!\n\n')
-    for i in getResults(errors):
-        docnum += 1
-        sys.stdout.write('Creating error file ' + str(docnum) + ' out of ' + errorlen + '... ')
-        errorAnalysis(i[0][0], i[0][1])
-        if  i[1] == 1:
-            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' time.</li>')
-        else:
-            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' times.</li>')
-        sys.stdout.write(' Done!\n')
-    out.write('</ul>')
-    out.write('</body>')
-    out.write('</html>')
-print '\nConfusion matrix successfully generated.'
-print '\nAll files successfuly written to ' + path
-print 'Took', datetime.datetime.now()-startTime, 'to run', numFiles/2, 'files.'
+def prettify(elem):
+    """Return a pretty-printed XML string for the Element.
+    """
+    rough_string = ET.tostring(elem, 'utf-8')
+    reparsed = minidom.parseString(rough_string)
+    return reparsed.toprettyxml(indent="  ")
+
+class TElement(ET._Element):
+    
+    def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
+        ET._Element.__init__(self, tag, dict(attrib, **extra))
+        
+        if text:
+            self.text = text
+        if tail:
+            self.tail = tail
+        if style:
+            self.style = style
+        if not parent == None:
+            parent.append(self)
 
 
-##    out.write("""       <table>
-##                            <tr>
-##                                <td></td>
-##                                <td></td>
-##                                <th colspan="5" style="border:1px solid black">Predicted (eng)<p><img src="http://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/U%2B2192.svg/25px-U%2B2192.svg.png"></p></th>
-##                            </tr>
-##                            <tr style="border:1px solid black">
-##                                <th style="border:1px solid black; width:60px;">
-##                                    <div class="vertical-text">
-##                                        <div class="vertical-text__inner"><th rowspan="5">Actual (gs)<p><img src="http://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/U%2B2190.svg/25px-U%2B2190.svg.png"></p></th></div>
-##                                    </div>
-##                                </th>""")
-##    out.write('<th style="border:1px solid black">' + '</th><th style="border:1px solid black">'.join(vals) +
-##              """</th><th style="border:1px solid black">Sum</th><th style="border:1px solid black">Micro-recall</th></tr>""")
-##    out.write('<tr></tr><tr></tr>')
-##    out.write("""
-##                        </table>
-##                    </div>
-##                    <p style="text-align:center; font-size:12px"> Email cmzelinsky@gmail.com for questions / comments / suggestions for this script </p>
-##                </body>
-##            </html> """)
-##    
-##    out.write('<tr><td><div id="container">')
-##    out.write('<table style="border:1px solid black"><tr style="border:1px solid black"><td></td><th colspan="3" style="border:1px solid black">Predicted (Engine Output)</th></tr></td></tr>')
-##    out.write('<tr style="border:1px solid black"><td></td><td style="border:1px solid black"></td><td style="border:1px solid black">1</td><td style="border:1px solid black">0</td></tr>')
-##    out.write('<tr style="border:1px solid black"><th><div class="vertical-text"><div class="vertical-text__inner">Actual (Gold Standards)</div></div></th>')
-##    out.write('<td style="border:1px solid black">1</td><td id="numbers" style="border:1px solid black">True Positives</td><td id="numbers" style="border:1px solid black">False Negatives</td></tr>')
-##    out.write('<tr style="border:1px solid black"><td></td><td id="numbers" style="border: 1px solid black">0</td><td id="numbers" style="border:1px solid black">False Postives</td><td style="border:1px solid black">True Negatives</td></tr>')
-##    out.write('</table></div></td></tr></table>')
-##    out.write('<table><tr><th><div class="vertical-text"><div class="vertical-text__inner">First th</div></div></th><td>Some cell</td><td>And another</td></tr><tr><th><div class="vertical-text"><div class="vertical-text__inner">Second th</div></div></th><td>12</td>')
-##    out.write('<td>12314</td></tr><tr><th><div class="vertical-text"><div class="vertical-text__inner">Third th</div></div></th><td>12</td><td>12314</td></tr></table></div>')
-##    out.write('<p style="text-align:center; font-size:12px"> Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script </p>')
-##    out.write('</body></html>')
+html = TElement('html')
+
+table = TElement('table', parent=html)
+
+headerRow = TElement('tr', parent=table)
+
+tableHeaders = [ TElement('th', text=goldLabel) for goldLabel in confusionMatrix]
+
+headerRow.extend(TElement('th', text="________", parent=headerRow))
+headerRow.extend(TElement('th', text="engine:", parent=headerRow))
+headerRow.extend(tableHeaders)
+
+goldBlankRow = TElement('tr', parent=table)
+goldBlankRow.extend(TElement('th', text= "gold stands:", parent=goldBlankRow))
+
+
+for label in confusionMatrix:
+    dataRow = TElement('tr', parent=table)
+    rowHeader = TElement('th', text=label, parent=dataRow)
+    blankData = TElement('td', parent=dataRow)
+    for comparison in confusionMatrix[label]:
+        comparisonData = [TElement('td', text=str(confusionMatrix[label][comparison])) for comparison in confusionMatrix[label]]
+    dataRow.extend(comparisonData)
+
+
+
+authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=html)
+
+# two ways:
+
+output = prettify(html)
+
+print(output)
+
+with open(os.path.join(path, "outputFile.html"), 'w') as outputFile:
+    outputFile.write(output)
+    outputParsed = ET.parse(os.path.join(path, "outputFile.html"))
+    html = tree.getroot()
+    css = Element('link', parent=html)
+    css.attrib['rel'] = "stylsheet"
+    css.attrib['type'] = "text/css"
+    css.attrib['href'] = "css.css"
+    html.extend(css)
+    
+outputFile.close()
+
+
+
+##
+##currentdi = {}
+##vals = {'LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE', 'ADDRESS',
+##        'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_CODE_NUMBER', 'NAME', 'ORGANIZATION',
+##        'URL', 'E_MAIL_ADDRESS', 'HOSPITAL', 'TIME', 'OTHER'}
+##with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
+##    out.write('<html><head><title>Confusion Matrix</title></head><body>')
+##    out.write('<h4>Generated at: ' + str(datetime.datetime.now()).split('.')[0] + '</h4>')
+##    out.write('<table border = "1"><th>gold/system</th><th>' + '</th><th>'.join(vals) + '</th><th>Sum</th><th>Micro-recall</th>')
+##    doc = minidom.Document()
+##    matrix = doc.createElement('Matrix')
+##    doc.appendChild(matrix)
+##    for var in vals:
+##        Gs = doc.createElement('goldStandard')
+##        attr = doc.createAttribute('count')
+##        Gs.setAttributeNode(attr)
+##        Gs.setAttribute('count', var)
+##        matrix.appendChild(Gs)
+##        out.write('<tr><th>' + var + '</th>')
+##        total = []
+##        for val in vals:
+##            Eng = doc.createElement('Engine')
+##            attr = doc.createAttribute('count')
+##            Eng.setAttributeNode(attr)
+##            Eng.setAttribute('count', val)
+##            print str(confusionMatrix[val]) + "confusion matrix val here!!!"
+##            if confusionMatrix[val] not in confusionMatrix.keys():
+##                value = doc.createTextNode(str(confusionMatrix[val][val]))
+##            else:
+##                value = doc.createTextNode('0')
+##            Eng.appendChild(value)
+##            Gs.appendChild(Eng)
+##            if val == var and not value.nodeValue == '0':
+##                current = value.nodeValue
+##                currentdi[val] = current
+##                out.write('<td bgcolor="#00CC33">' + value.nodeValue + '</td>')
+##            elif value.nodeValue == '0':
+##                out.write('<td bgcolor="#FFCC33">' + value.nodeValue + '</td>')
+##            else:
+##                out.write('<td bgcolor="#CC0000">' + value.nodeValue + '</td>')
+##            total.append(value.nodeValue)
+##        Summ = doc.createElement('sum')
+##        Sum = doc.createTextNode(str(sum([int(v) for v in total])))
+##        Summ.appendChild(Sum)
+##        Gs.appendChild(Summ)
+##        microrec = doc.createElement('Microrecall')
+##        try:
+##            mr = doc.createTextNode(str(Round(float(current)/float(Sum.nodeValue))))
+##        except:
+##            mr = doc.createTextNode('N/A')
+##        microrec.appendChild(mr)
+##        out.write('<td>' + Sum.nodeValue + '</td><td>' + mr.nodeValue + '</td</tr>')
+##    out.write('<tr><th>Sum</th><td>')
+##    Totals = []
+##    for var in vals:
+##        Totals.append(str(getTotal(var)))
+##    out.write('</td><td>'.join(Totals) + '</td></tr>')
+##    out.write('<tr><th>Micro-precision</th>')
+##    for var in vals:
+##        if not var in currentdi.keys():
+##            currentdi[var] = 0
+##        for i in currentdi:
+##            if i == var:
+##                try:
+##                    out.write('<td>' + str(Round((float(currentdi[i])/getTotal(var)))))
+##                except ZeroDivisionError:
+##                    out.write('<td>N/A')
+##    out.write('</td></tr></table>')
+##    out.write('<h4>Total correct: ' + str(sum(int(i) for i in currentdi.values())) + '</h4>')
+##    out.write('<h4>Total errors: ' + str(sum(errors.values())) + '</h4>')
+##    out.write('<h4>Total MIMs: ' + str(sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')])) + '</h4>')
+####    out.write('<h4>Accuracy: ' + str(Round(float(sum(int(i) for i in currentdi.values()))/sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')]))))
+##    out.write('<h4>Number of documents: ' + str(numFiles/2) + '</h4>')
+##    out.write('<h3>List view:</h3>')
+##    out.write('<h4>True Positives:</h4><ul>')
+##    for i in getResults(tp):
+##        out.write('<li>' + i[0] + ' correctly identified as such ' + str(i[1]) + ' times.</li>')
+##    out.write('</ul><h4>Errors:</h4><ul>')
+##    errorlen = str(len(errors))
+##    docnum = 0
+##    sys.stdout.write('\nDumping the allmims object to file for future reuse...')
+##    pickle.dump(allmims, open(path + '\\allmims.txt', 'w'))
+##    sys.stdout.write(' Done!\n\n')
+##    for i in getResults(errors):
+##        docnum += 1
+##        sys.stdout.write('Creating error file ' + str(docnum) + ' out of ' + errorlen + '... ')
+##        errorAnalysis(i[0][0], i[0][1])
+##        if  i[1] == 1:
+##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' time.</li>')
+##        else:
+##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' times.</li>')
+##        sys.stdout.write(' Done!\n')
+##    out.write('</ul>')
+##    out.write('</body>')
+##    out.write('</html>')
+##print '\nConfusion matrix successfully generated.'
+##print '\nAll files successfuly written to ' + path
+##print 'Took', datetime.datetime.now()-startTime, 'to run', numFiles/2, 'files.'
+
