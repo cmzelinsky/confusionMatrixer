@@ -69,4 +69,7 @@ print(output)
 
 with open(os.path.join(path, "outputFile.html"), 'w') as outputFile:
     outputFile.write(output)
+    outputParsed = parse(os.path.join(path, "outputFile.html"))
+    html = outputParsed.getElementsByTagName('html')
+    html.appendChild('
 outputFile.close()

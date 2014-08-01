@@ -10,7 +10,7 @@
 ## 2)	There is no link from confusion matrix to details files."
 ##
 
-import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2
+import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
@@ -30,7 +30,7 @@ if not os.path.exists(path):
 def findPair(fname): 
     return fname[:-3] + 'out.xml'
 
-## splitting lists by the relevant splitter : http://stackoverflow.com/questions/4322705/split-a-list-into-nested-lists-on-a-value
+# splitting lists by the relevant splitter : http://stackoverflow.com/questions/4322705/split-a-list-into-nested-lists-on-a-value
 def _itersplit(l, splitters):
     current = []
     for item in l:
@@ -44,6 +44,33 @@ def _itersplit(l, splitters):
 def magicsplit(l, *splitters):
     return tuple([subl for subl in _itersplit(l, splitters) if subl])
 
+def getTextForKWIC(fname, entries):
+    '''Intake a nested dict of {filename:{gsLabel:{engineLabel:entryNums, ...}, ...} ...}
+
+    '''
+    entries = entries.split(', ')
+    doc = minidom.parse(path + '\\' + fname)
+    docTemp = ET.parse(path + '\\' + fname)
+    concept = []
+    text = []
+    separator = '::::'
+    for entry in entries:
+        concept.append(docTemp.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
+    concept = ''.join(concept)[:-1]
+    for w in docTemp.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
+        if w.getAttribute('ID') in entries:
+            if not w.firstChild.localName == 'hit':
+                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>')
+            else:
+                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.firstChild.nodeValue + '</strong></font>')
+        else:
+            if not w.firstChild.localName == 'hit':
+                para.append(w.firstChild.nodeValue)
+            else:
+                para.append(w.firstChild.firstChild.nodeValue)
+    para = '<span onclick="showHide(this)" style="cursor:pointer">Context <span class="plusMinus">[+]</span></span><br><span style="display:none">' + ''.join(text) + '</span>'
+    return fname + separator + concept + separator + text
+
 ## Begin processing...
 docCount=0
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
@@ -51,26 +78,24 @@ allData = {}
 truePosCount = 0
 falseNegCount = 0
 falsePosCount = 0
-confusionMatrix = {}
+confusionMatrix = collections.OrderedDict()
 
 # Creates rows and columns for the matrix labeled with codes(matrixValues)
 # Instantiates each false/true positive count to 0
 matrixValues = [u'LAST_NAME', u'MALE_NAME', u'FEMALE_NAME', u'PHONE_NUMBER', u'MEDICAL_RECORD_NUMBER', u'ABSOLUTE_DATE', u'DATE', 
 u'ADDRESS', u'LOCATION', u'AGE', u'SOCIAL_SECURITY_NUMBER', u'CERTIFICATE_OR_LICENSE_NUMBER', u'ID_OR_OTHER_CODE', u'NAME',
 u'ORGANIZATION', u'URL', u'E_MAIL_ADDRESS', u'TIME', u'OTHER', u'HOSPITAL', u'INITIAL']
-for value in matrixValues:
-    confusionMatrix[value] = {}
-    for value2 in matrixValues:
-        confusionMatrix[value][value2] = 0
 
 for doc in docs:
     if not doc.endswith('.out.xml'):
         docCount += 1
+        
         print "\n\n_______________________________________\n"
         print "Now parsing document %s out of %s..." % (docCount, len(docs)/2)
         print "_______________________________________\n\n"
-        parsedGSDoc = parse(path + '/' + doc)
-        parsedEngineDoc = parse(findPair(path + '/' + doc))                   
+        
+        parsedGSDoc = parse(path + '\\' + doc)
+        parsedEngineDoc = parse(findPair(path + '\\' + doc))                   
         gsCodes = []
         gsEntryNumsOnly = []
         gsEntryNums = []
@@ -79,12 +104,25 @@ for doc in docs:
         gsParent = []
         outputList = []
         documentText = {}
-        ## Establishing the gold standard data structures
-        ##  assmpt for now -- will throw a test in later: the gold standard set is perfect & 1:1 ###
+        #engAndGsOnly[doc] = {}
+
+        #confusionMatrix[doc] = {}
+        for value in matrixValues:
+            confusionMatrix[value] = {}
+            for value2 in matrixValues:
+                confusionMatrix[value][value2] = 0
+
+        def collectText(doc):
+            doc = ET.parse(path + '\\' + fname)
+            
+        
+        # Establishing the gold standard data structures
+        
+        #  assmpt for now (will throw a test in later): the gold standard set is perfect & 1:1 
         gsCodeNodes = parsedGSDoc.getElementsByTagName('mm:code') #code node
         for node in gsCodeNodes:
             gsCodes.append(node.getAttribute('code'))
-            ### codes just looks like a list of all the codes in order of mim appearance ###
+            # codes just looks like a list of all the codes in order of mim appearance 
         gsParent = parsedGSDoc.getElementsByTagName('mm:binding') #code's sister 'mm:binding' node
         for item in gsParent:
             for child in item.getElementsByTagName('mm:narrativeBinding'):
@@ -92,10 +130,10 @@ for doc in docs:
                 gsEntryNums.append(child.getAttribute('ref'))
             gsEntryNums.append('\n')
         del gsEntryNums[-1]
-        ### all the tokenization ref nums associated with the codes ###
+        # all the tokenization ref nums associated with the codes 
         gsEntryNumsGrouped = magicsplit(gsEntryNums, '\n')
         gsEntryNumsGroupedTuple = tuple(tuple(x) for x in gsEntryNumsGrouped)
-        ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) ###
+        # which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) 
         gsDic = dict(zip(gsEntryNumsGroupedTuple, gsCodes))
         
         # if an entry number appears twice (if the gold standard isn't perfect + has overlapping entries),
@@ -117,6 +155,7 @@ for doc in docs:
         ##          finalGSDic[entry] = ((gsWorkingData[i][1], gsDic2[entry]))
 
         # Don't need this if I can get the xpath module working ^^^
+        
 
         ## Establishing the engine data structures
         engineCodes = []
@@ -126,7 +165,7 @@ for doc in docs:
         engineCodeNodes = parsedEngineDoc.getElementsByTagName('mm:code')
         for node in engineCodeNodes:
             engineCodes.append(node.getAttribute('code'))
-            ### codes just looks like a list of all the codes in order of mim appearance ###
+            # codes just looks like a list of all the codes in order of mim appearance ###
         engineParent = parsedEngineDoc.getElementsByTagName('mm:binding')
         for item in engineParent:
             for child in item.getElementsByTagName('mm:narrativeBinding'):
@@ -137,9 +176,11 @@ for doc in docs:
 
         engineEntryNumsGrouped = magicsplit(engineEntryNums, '\n')
         engineEntryNumsGroupedTuple = tuple(tuple(x) for x in engineEntryNumsGrouped)
-            ### which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...] ###
-            ### Helpful because you can see the scoping of a certain mim ... len(entryNumsGrouped[1]) -> 3 (tokens long) ###
-        engDic = dict(zip(engineEntryNumsGroupedTuple, engineCodes))
+            # ...which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...] ###
+            # Helpful because you can see the scoping of a certain mim ... len(entryNumsGrouped[1]) -> 3 (tokens long) ###
+        engList = zip(engineEntryNumsGroupedTuple, engineCodes)
+        # engDic = dict(zip(engineEntryNumsGroupedTuple, engineCodes)) #absolutely cannot be used unless I can easily encode and unencode duplicate entry tuple:code pairs
+
 
         ## Begin comparison of data structures
 
@@ -169,32 +210,32 @@ for doc in docs:
         # Increments false positive count
         # Checks whether entries that exist in the engine exist in the gold standard
         # If not, it's a false positive
-        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
-        for x in engDic:
+        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
+        for entry_codePair in engDic:
             # If value is in engine and not gs, increment
-            if x not in gsDic:
+            if entry_codePair not in gsDic:
                 if "ENGINE_ONLY_ENTRY" in confusionMatrix:
-                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[x]] += 1
+                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry_codePair]] += 1
                 else:
                     confusionMatrix["ENGINE_ONLY_ENTRY"] = {}
                     for value in matrixValues:
                         confusionMatrix["ENGINE_ONLY_ENTRY"][value] = 0
-                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[x]] += 1
+                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry_codePair]] += 1
             # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
-            elif gsDic[x] != engDic[x]:
-                confusionMatrix[gsDic[x]][engDic[x]] += 1
+            elif gsDic[entry_codePair] != engDic[entry_codePair]:
+                confusionMatrix[gsDic[entry_codePair]][engDic[entry_codePair]] += 1
 
                 
         # Increments false negative count
         # Checks whether entries that exist in the gold standard exist in the engine
         # If not, it's a false negative
         # NOTE: Doesn't include error checking. Base it off the true positives' error checking
-        for x in gsDic:
-            if x not in engDic:
-                if "GS_ONLY_ENTRY" in confusionMatrix[gsDic[x]]:
-                    confusionMatrix[gsDic[x]]["GS_ONLY_ENTRY"] += 1
+        for entry_codePair in gsDic:
+            if entry_codePair not in engDic:
+                if "GS_ONLY_ENTRY" in confusionMatrix[gsDic[entry_codePair]]:
+                    confusionMatrix[gsDic[entry_codePair]]["GS_ONLY_ENTRY"] += 1
                 else:
-                    confusionMatrix[gsDic[x]]["GS_ONLY_ENTRY"] = 1
+                    confusionMatrix[gsDic[entry_codePair]]["GS_ONLY_ENTRY"] = 1
 
         print("**************************************")
         for key in confusionMatrix.keys():
@@ -244,7 +285,7 @@ for doc in docs:
                     print engineDiffsEntries[i][1] + " was confused for the correct mim code " + gsDic[gsDic.keys()[j]]
                     scopeMatchValueMismatch.append(gsDic[j][0])
         """
-        # Get each gs diff entry (ede)
+        # Get each gs diff entry (ede -- engine diff entry)
         for gde in gsDiffsEntries:
             # Get the key (a tuple) of each gold standard dic item
             for key in gsDic.keys():
@@ -254,11 +295,8 @@ for doc in docs:
                 if strGDE == strKey:
                     print("same")
 
-        # checks for overlap
-        print("************")
-        print gsDiffsEntries
-        print("************")
-        print engDiffsEntries
+        # Checking for overlap
+
         print("************\nOverlap handling\n")
         incompleteOverlaps = 0
         completeOverlaps = 0
@@ -270,6 +308,9 @@ for doc in docs:
                         if str(gsKeyTup[i]) == str(engKeyTup[j]):
                             if str(gsKeyTup) == str(engKeyTup):
                                 completeOverlaps += 1
+                                print str(gsKeyTup)
+                                print str(engKeyTup)
+                                print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
                             else:
                                 incompleteOverlaps += 1
                     if completeOverlaps > 0 or incompleteOverlaps > 0:
@@ -308,8 +349,8 @@ for doc in docs:
 ##        print "Scoping was problematic involving %s MIMs, which were:" % len(scopeMismatchValueMatch)
 ##        print scopeMismatchValueMatch
         
-##print '\nConfusion matrix successfully generated.'
-##print '\nAll files successfully written to ' + gsPath
+
+#print '\nConfusion Matrix genereated. written to ' + gsPath
 
 print 'Took', datetime.datetime.now()-startTime, 'to run %s files.\n\n' % (len(docs)/2)
 
@@ -323,28 +364,15 @@ print 'False Positives: ' + str(falsePosCount)
 # HTML Output
 #
 
-##vals = ['LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE',
-##        'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_OTHER_CODE',
-##        'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'TIME', 'OTHER']
+#vals = ['LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE',
+#        'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_OTHER_CODE',
+#        'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'TIME', 'OTHER']
  
-with open(os.path.join(path, 'confusionMatrixForDeid.html'), 'w') as out:
-    out.write("""<html>
-                    <head>
-                        <link rel="stylesheet" type="text/css" href="deid.css">
-                        <title>Deid Stats Results</title>
-                    </head>
-                    <body style="font-family:sans-serif">
-                        <table>
-                            <tr>
-                                <td>
-                                <h2>Deid Stats Results</h2>""")
-    
-    out.write('<h4>Generated at: ' + str(datetime.datetime.now()).split('.')[0] + '</h4>')
 
-    out.write('<h3>Total correct: ' + str(len(truePositives)) + '</h3>')
-    out.write('<h3>Total errors: ' + str(falsePosCount+falseNegCount) + ' </h3>')
-    out.write('<h3>Total GS MIMs: ' + str(len(gsDic)) + '</h3>')
-    out.write('<h3>Total Engine MIMs: ' + str(len(engDic)) + '</h3></td></tr></table>')
+##    out.write('<h3>Total correct: ' + str(len(truePositives)) + '</h3>')
+##    out.write('<h3>Total errors: ' + str(falsePosCount+falseNegCount) + ' </h3>')
+##    out.write('<h3>Total GS MIMs: ' + str(len(gsDic)) + '</h3>')
+##    out.write('<h3>Total Engine MIMs: ' + str(len(engDic)) + '</h3></td></tr></table>')
 
 
 def prettify(elem):
@@ -367,22 +395,43 @@ class TElement(ET._Element):
             self.style = style
         if not parent == None:
             parent.append(self)
-
+            
+# Creating dom structure, adding proper headers and td's for each label of comparison
 
 html = TElement('html')
 
-table = TElement('table', parent=html)
+#Header
+head = TElement('head', parent=html)
+
+title = TElement('title', text="Deid Stats Results", parent=head)
+css = TElement('link', parent=head)
+
+css.attrib['href'] = "css.css"
+css.attrib['type'] = "text/css"
+css.attrib['rel'] = "stylesheet"
+
+head.extend(css)
+head.extend(title)
+
+#Body
+body = TElement('body', parent=html)
+
+h1 = TElement('h1', text="Deid Stats Results:", parent=body)
+
+timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
+
+table = TElement('table', parent=body)
 
 headerRow = TElement('tr', parent=table)
 
 tableHeaders = [ TElement('th', text=goldLabel) for goldLabel in confusionMatrix]
 
-headerRow.extend(TElement('th', text="________", parent=headerRow))
-headerRow.extend(TElement('th', text="engine:", parent=headerRow))
+headerRow.extend(TElement('th', parent=headerRow))
+headerRow.extend(TElement('th', text="Engine:", parent=headerRow))
 headerRow.extend(tableHeaders)
 
 goldBlankRow = TElement('tr', parent=table)
-goldBlankRow.extend(TElement('th', text= "gold stands:", parent=goldBlankRow))
+goldBlankRow.extend(TElement('th', text="Gold Standards:", parent=goldBlankRow))
 
 
 for label in confusionMatrix:
@@ -391,128 +440,23 @@ for label in confusionMatrix:
     blankData = TElement('td', parent=dataRow)
     for comparison in confusionMatrix[label]:
         comparisonData = [TElement('td', text=str(confusionMatrix[label][comparison])) for comparison in confusionMatrix[label]]
+        for element in comparisonData:
+            if element.text != '0':
+                element.attrib['style'] = "background:orange"
     dataRow.extend(comparisonData)
 
+    
 
+authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
 
-authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=html)
+# KWIC examination text to go here
 
-# two ways:
 
 output = prettify(html)
+print(output) #just to take a look
 
-print(output)
-
-with open(os.path.join(path, "outputFile.html"), 'w') as outputFile:
+with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
     outputFile.write(output)
-    outputParsed = ET.parse(os.path.join(path, "outputFile.html"))
-    html = tree.getroot()
-    css = Element('link', parent=html)
-    css.attrib['rel'] = "stylsheet"
-    css.attrib['type'] = "text/css"
-    css.attrib['href'] = "css.css"
-    html.extend(css)
-    
-outputFile.close()
 
-
-
-##
-##currentdi = {}
-##vals = {'LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE', 'ADDRESS',
-##        'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_CODE_NUMBER', 'NAME', 'ORGANIZATION',
-##        'URL', 'E_MAIL_ADDRESS', 'HOSPITAL', 'TIME', 'OTHER'}
-##with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
-##    out.write('<html><head><title>Confusion Matrix</title></head><body>')
-##    out.write('<h4>Generated at: ' + str(datetime.datetime.now()).split('.')[0] + '</h4>')
-##    out.write('<table border = "1"><th>gold/system</th><th>' + '</th><th>'.join(vals) + '</th><th>Sum</th><th>Micro-recall</th>')
-##    doc = minidom.Document()
-##    matrix = doc.createElement('Matrix')
-##    doc.appendChild(matrix)
-##    for var in vals:
-##        Gs = doc.createElement('goldStandard')
-##        attr = doc.createAttribute('count')
-##        Gs.setAttributeNode(attr)
-##        Gs.setAttribute('count', var)
-##        matrix.appendChild(Gs)
-##        out.write('<tr><th>' + var + '</th>')
-##        total = []
-##        for val in vals:
-##            Eng = doc.createElement('Engine')
-##            attr = doc.createAttribute('count')
-##            Eng.setAttributeNode(attr)
-##            Eng.setAttribute('count', val)
-##            print str(confusionMatrix[val]) + "confusion matrix val here!!!"
-##            if confusionMatrix[val] not in confusionMatrix.keys():
-##                value = doc.createTextNode(str(confusionMatrix[val][val]))
-##            else:
-##                value = doc.createTextNode('0')
-##            Eng.appendChild(value)
-##            Gs.appendChild(Eng)
-##            if val == var and not value.nodeValue == '0':
-##                current = value.nodeValue
-##                currentdi[val] = current
-##                out.write('<td bgcolor="#00CC33">' + value.nodeValue + '</td>')
-##            elif value.nodeValue == '0':
-##                out.write('<td bgcolor="#FFCC33">' + value.nodeValue + '</td>')
-##            else:
-##                out.write('<td bgcolor="#CC0000">' + value.nodeValue + '</td>')
-##            total.append(value.nodeValue)
-##        Summ = doc.createElement('sum')
-##        Sum = doc.createTextNode(str(sum([int(v) for v in total])))
-##        Summ.appendChild(Sum)
-##        Gs.appendChild(Summ)
-##        microrec = doc.createElement('Microrecall')
-##        try:
-##            mr = doc.createTextNode(str(Round(float(current)/float(Sum.nodeValue))))
-##        except:
-##            mr = doc.createTextNode('N/A')
-##        microrec.appendChild(mr)
-##        out.write('<td>' + Sum.nodeValue + '</td><td>' + mr.nodeValue + '</td</tr>')
-##    out.write('<tr><th>Sum</th><td>')
-##    Totals = []
-##    for var in vals:
-##        Totals.append(str(getTotal(var)))
-##    out.write('</td><td>'.join(Totals) + '</td></tr>')
-##    out.write('<tr><th>Micro-precision</th>')
-##    for var in vals:
-##        if not var in currentdi.keys():
-##            currentdi[var] = 0
-##        for i in currentdi:
-##            if i == var:
-##                try:
-##                    out.write('<td>' + str(Round((float(currentdi[i])/getTotal(var)))))
-##                except ZeroDivisionError:
-##                    out.write('<td>N/A')
-##    out.write('</td></tr></table>')
-##    out.write('<h4>Total correct: ' + str(sum(int(i) for i in currentdi.values())) + '</h4>')
-##    out.write('<h4>Total errors: ' + str(sum(errors.values())) + '</h4>')
-##    out.write('<h4>Total MIMs: ' + str(sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')])) + '</h4>')
-####    out.write('<h4>Accuracy: ' + str(Round(float(sum(int(i) for i in currentdi.values()))/sum([int(i.firstChild.nodeValue) for i in doc.getElementsByTagName('sum')]))))
-##    out.write('<h4>Number of documents: ' + str(numFiles/2) + '</h4>')
-##    out.write('<h3>List view:</h3>')
-##    out.write('<h4>True Positives:</h4><ul>')
-##    for i in getResults(tp):
-##        out.write('<li>' + i[0] + ' correctly identified as such ' + str(i[1]) + ' times.</li>')
-##    out.write('</ul><h4>Errors:</h4><ul>')
-##    errorlen = str(len(errors))
-##    docnum = 0
-##    sys.stdout.write('\nDumping the allmims object to file for future reuse...')
-##    pickle.dump(allmims, open(path + '\\allmims.txt', 'w'))
-##    sys.stdout.write(' Done!\n\n')
-##    for i in getResults(errors):
-##        docnum += 1
-##        sys.stdout.write('Creating error file ' + str(docnum) + ' out of ' + errorlen + '... ')
-##        errorAnalysis(i[0][0], i[0][1])
-##        if  i[1] == 1:
-##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' time.</li>')
-##        else:
-##            out.write('<li>' + i[0][0] + ' mistakenly marked as ' + i[0][1] + ' ' + str(i[1]) + ' times.</li>')
-##        sys.stdout.write(' Done!\n')
-##    out.write('</ul>')
-##    out.write('</body>')
-##    out.write('</html>')
-##print '\nConfusion matrix successfully generated.'
-##print '\nAll files successfuly written to ' + path
-##print 'Took', datetime.datetime.now()-startTime, 'to run', numFiles/2, 'files.'
+print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
 
