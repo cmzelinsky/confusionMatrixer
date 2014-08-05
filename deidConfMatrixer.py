@@ -30,20 +30,6 @@ if not os.path.exists(path):
 def findPair(fname): 
     return fname[:-3] + 'out.xml'
 
-# splitting lists by the relevant splitter : http://stackoverflow.com/questions/4322705/split-a-list-into-nested-lists-on-a-value
-def _itersplit(l, splitters):
-    current = []
-    for item in l:
-        if item in splitters:
-            yield current
-            current = []
-        else:
-            current.append(item)
-    yield current
-
-def magicsplit(l, *splitters):
-    return tuple([subl for subl in _itersplit(l, splitters) if subl])
-
 def getTextForKWIC(fname, entries):
     '''Intake a nested dict of {filename:{gsLabel:{engineLabel:entryNums, ...}, ...} ...}
 
@@ -78,13 +64,12 @@ allData = {}
 truePosCount = 0
 falseNegCount = 0
 falsePosCount = 0
-confusionMatrix = collections.OrderedDict()
+confusionMatrix = {}
 
-# Creates rows and columns for the matrix labeled with codes(matrixValues)
-# Instantiates each false/true positive count to 0
-matrixValues = [u'LAST_NAME', u'MALE_NAME', u'FEMALE_NAME', u'PHONE_NUMBER', u'MEDICAL_RECORD_NUMBER', u'ABSOLUTE_DATE', u'DATE', 
-u'ADDRESS', u'LOCATION', u'AGE', u'SOCIAL_SECURITY_NUMBER', u'CERTIFICATE_OR_LICENSE_NUMBER', u'ID_OR_OTHER_CODE', u'NAME',
-u'ORGANIZATION', u'URL', u'E_MAIL_ADDRESS', u'TIME', u'OTHER', u'HOSPITAL', u'INITIAL']
+
+matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
+(u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_OTHER_CODE',), (u'NAME',),
+(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',)]
 
 for doc in docs:
     if not doc.endswith('.out.xml'):
@@ -95,7 +80,8 @@ for doc in docs:
         print "_______________________________________\n\n"
         
         parsedGSDoc = parse(path + '\\' + doc)
-        parsedEngineDoc = parse(findPair(path + '\\' + doc))                   
+        parsedEngDoc = parse(findPair(path + '\\' + doc))
+        
         gsCodes = []
         gsEntryNumsOnly = []
         gsEntryNums = []
@@ -106,6 +92,8 @@ for doc in docs:
         documentText = {}
         #engAndGsOnly[doc] = {}
 
+        # Creates rows and columns for the matrix labeled with codes(matrixValues)
+        # Instantiates each false/true positive count to 0
         #confusionMatrix[doc] = {}
         for value in matrixValues:
             confusionMatrix[value] = {}
@@ -118,28 +106,28 @@ for doc in docs:
         
         # Establishing the gold standard data structures
         
-        #  assmpt for now (will throw a test in later): the gold standard set is perfect & 1:1 
-        gsCodeNodes = parsedGSDoc.getElementsByTagName('mm:code') #code node
-        for node in gsCodeNodes:
-            gsCodes.append(node.getAttribute('code'))
-            # codes just looks like a list of all the codes in order of mim appearance 
-        gsParent = parsedGSDoc.getElementsByTagName('mm:binding') #code's sister 'mm:binding' node
-        for item in gsParent:
-            for child in item.getElementsByTagName('mm:narrativeBinding'):
-                gsEntryNumsOnly.append(child.getAttribute('ref'))
-                gsEntryNums.append(child.getAttribute('ref'))
-            gsEntryNums.append('\n')
-        del gsEntryNums[-1]
-        # all the tokenization ref nums associated with the codes 
-        gsEntryNumsGrouped = magicsplit(gsEntryNums, '\n')
-        gsEntryNumsGroupedTuple = tuple(tuple(x) for x in gsEntryNumsGrouped)
-        # which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...) 
-        gsDic = dict(zip(gsEntryNumsGroupedTuple, gsCodes))
-        
-        # if an entry number appears twice (if the gold standard isn't perfect + has overlapping entries),
-        #  i'll need to create a test for the engine output later
-        # gsDic1[entry] = gsWorkingData[i][1]
-        # which looks like {'entry_217' : 'DATE', 'entry_216': 'DATE', 'entry_36': 'DATE', 'entry_274': 'LAST_NAME' ...}
+        #  assmpt: the gold standard set is perfect & 1:1 
+        gsDic = {}
+        entries = parsedGSDoc.getElementsByTagName('entry')
+        for entry in entries:
+            bindings = []
+            for child in entry.firstChild.childNodes:
+                if child.localName == 'binding':
+                    print bindings
+                    bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
+                    entries = tuple(str(binding) for binding in bindings if len(binding)>0)
+                    print entries 
+                    value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
+                    print value
+                    if entries in gsDic:
+                        gsDic[entries].append(str(value).strip('[]'))
+                    else:
+                        gsDic[entries] = value
+        for k, v in gsDic.items():
+            gsDic[k] = tuple(v)
+                        
+        # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
+
 
 ##        contentNodes = parsedGSDoc.getElementsByTagName('content')
 ##        for node in contentNodes:
@@ -158,90 +146,87 @@ for doc in docs:
         
 
         ## Establishing the engine data structures
-        engineCodes = []
-        engineEntryNumsOnly = []
-        engineEntryNums = []
-        engineParent = []
-        engineCodeNodes = parsedEngineDoc.getElementsByTagName('mm:code')
-        for node in engineCodeNodes:
-            engineCodes.append(node.getAttribute('code'))
-            # codes just looks like a list of all the codes in order of mim appearance ###
-        engineParent = parsedEngineDoc.getElementsByTagName('mm:binding')
-        for item in engineParent:
-            for child in item.getElementsByTagName('mm:narrativeBinding'):
-                engineEntryNumsOnly.append(child.getAttribute('ref'))
-                engineEntryNums.append(child.getAttribute('ref'))
-            engineEntryNums.append('\n')
-        del engineEntryNums[-1]
+        engDic = {}
+        entries = parsedEngDoc.getElementsByTagName('entry')
+        for entry in entries:
+            bindings = []
+            for child in entry.firstChild.childNodes:
+                if child.localName == 'binding':
+                    bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
+                    entries = tuple(str(binding) for binding in bindings if len(binding)>0)
+                    value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
+                    if entries in engDic:
+                        engDic[entries].append(str(value).strip('[]'))
+                    else:
+                        engDic[entries] = value
+        for k, v in engDic.items():
+            engDic[k] = tuple(v)
 
-        engineEntryNumsGrouped = magicsplit(engineEntryNums, '\n')
-        engineEntryNumsGroupedTuple = tuple(tuple(x) for x in engineEntryNumsGrouped)
-            # ...which looks like ((u'entry_102'), (u'entry_7', u'entry_8', u'entry_9'), (u'entry_35', u'entry_36') ...] ###
-            # Helpful because you can see the scoping of a certain mim ... len(entryNumsGrouped[1]) -> 3 (tokens long) ###
-        engList = zip(engineEntryNumsGroupedTuple, engineCodes)
-        # engDic = dict(zip(engineEntryNumsGroupedTuple, engineCodes)) #absolutely cannot be used unless I can easily encode and unencode duplicate entry tuple:code pairs
-
-
+            
         ## Begin comparison of data structures
 
         # True Positives
-        truePositives = {x:gsDic[x] for x in gsDic if x in engDic and gsDic[x] == engDic[x]}
+        truePositives = {entry:tuple(gsDic[entry]) for entry in gsDic if entry in engDic and gsDic[entry] == engDic[entry]}
+        # Add multi-code entries as well:
+        for entry in gsDic.keys():
+            if entry in gsDic.keys() and entry in engDic.keys() and entry not in truePositives:
+                truePositives[entry] = tuple(code for code in engDic[entry])
+            
         # Increments true positive counters in the confusion matrix
-        for x in gsDic.keys():          # note: for x in dic === for x in dic.keys()
-            if x in engDic and engDic[x] == gsDic[x]:
-                # If the value exists, increment it
-                if engDic[x] in confusionMatrix and engDic[x] in confusionMatrix[engDic[x]]:
-                   confusionMatrix[engDic[x]][engDic[x]] += 1
+        for entry in gsDic.keys():
+            if entry in truePositives and truePositives[entry] == gsDic[entry]:
+                if truePositives[entry] in confusionMatrix and truePositives[entry] in confusionMatrix[truePositives[entry]]:
+                    #if entry in engDic and engDic[entry] == gsDic[entry] # If the value exists, increment it
+                   confusionMatrix[truePositives[entry]][truePositives[entry]] += 1
                 # If the value doesn't exist, add another row/column for it
                 else:
-                    confusionMatrix[engDic[x]] = {}
+                    confusionMatrix[truePositives[entry]] = {}
                     for value2 in matrixValues:
-                        confusionMatrix[engDic[x]][value2] = 0
-                    confusionMatrix[engDic[x]][engDic[x]] = 1
+                        confusionMatrix[truePositives[entry]][value2] = 0
+                    confusionMatrix[truePositives[entry]][truePositives[entry]] = 1
         print "True Positives: (x%s found!)\n" % len(truePositives)
         truePosCount += len(truePositives)
         print truePositives
         
         # Checking for false positives, false negatives, and mismatches...
 
-        gsDiffs = {x:gsDic[x] for x in gsDic if x not in engDic}
-        engDiffs = {x:engDic[x] for x in engDic if x not in gsDic}
+        gsDiffs = {entry:gsDic[entry] for entry in gsDic if entry not in engDic}
+        engDiffs = {entry:engDic[entry] for entry in engDic if entry not in gsDic}
 
-        # Increments false positive count
-        # Checks whether entries that exist in the engine exist in the gold standard
-        # If not, it's a false positive
-        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
-        for entry_codePair in engDic:
-            # If value is in engine and not gs, increment
-            if entry_codePair not in gsDic:
-                if "ENGINE_ONLY_ENTRY" in confusionMatrix:
-                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry_codePair]] += 1
-                else:
-                    confusionMatrix["ENGINE_ONLY_ENTRY"] = {}
-                    for value in matrixValues:
-                        confusionMatrix["ENGINE_ONLY_ENTRY"][value] = 0
-                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry_codePair]] += 1
-            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
-            elif gsDic[entry_codePair] != engDic[entry_codePair]:
-                confusionMatrix[gsDic[entry_codePair]][engDic[entry_codePair]] += 1
-
-                
-        # Increments false negative count
-        # Checks whether entries that exist in the gold standard exist in the engine
-        # If not, it's a false negative
-        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
-        for entry_codePair in gsDic:
-            if entry_codePair not in engDic:
-                if "GS_ONLY_ENTRY" in confusionMatrix[gsDic[entry_codePair]]:
-                    confusionMatrix[gsDic[entry_codePair]]["GS_ONLY_ENTRY"] += 1
-                else:
-                    confusionMatrix[gsDic[entry_codePair]]["GS_ONLY_ENTRY"] = 1
-
-        print("**************************************")
-        for key in confusionMatrix.keys():
-            print key, confusionMatrix[key]
-            print
-        print("**************************************")
+##        # Increments false positive count
+##        # Checks whether entries that exist in the engine exist in the gold standard
+##        # If not, it's a false positive
+##        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
+##        for entry in engDic:
+##            # If value is in engine and not gs, increment
+##            if entry not in gsDic:
+##                if "ENGINE_ONLY_ENTRY" in confusionMatrix:
+##                    print "x1 engine only entry in confMatrix, so now incrementing"
+##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+##                else:
+##                    print "no engine only entry found for this dic in confmatrix, now making a new dic"
+##                    confusionMatrix["ENGINE_ONLY_ENTRY"] = {}
+##                    for value in matrixValues:
+##                        print "now initializing code from matrixValues to zero"
+##                        confusionMatrix["ENGINE_ONLY_ENTRY"][value] = 0
+##                    print confusionMatrix["ENGINE_ONLY_ENTRY"]
+##                    print "x1 engine only entry created, and now incrementing"
+##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+##            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
+####            elif gsDic[entry] != engDic[entry]:
+####                confusionMatrix[gsDic[entry]][engDic[entry]] += 1
+##
+##                
+##        # Increments false negative count
+##        # Checks whether entries that exist in the gold standard exist in the engine
+##        # If not, it's a false negative
+##        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
+##        for entry in gsDic:
+##            if entry not in engDic:
+##                if "GS_ONLY_ENTRY" in confusionMatrix[gsDic[entry]]:
+##                    confusionMatrix[gsDic[entry]]["GS_ONLY_ENTRY"] += 1
+##                else:
+##                    confusionMatrix[gsDic[entry]]["GS_ONLY_ENTRY"] = 1
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
@@ -269,6 +254,7 @@ for doc in docs:
         print "_____________________________________________\n"
 
         scopeMatchValueMismatch = []
+        """
         print("~")
         print(engineDiffsEntries)
         print("-----")
@@ -276,7 +262,6 @@ for doc in docs:
         print("-------")
         print(gsDiffsEntries)
         print("~")
-        """
         for i in range(len(engDiffsEntries)):
             for j in range(len(gsDic)):
             # Comparing against true positives
@@ -350,9 +335,7 @@ for doc in docs:
 ##        print scopeMismatchValueMatch
         
 
-#print '\nConfusion Matrix genereated. written to ' + gsPath
 
-print 'Took', datetime.datetime.now()-startTime, 'to run %s files.\n\n' % (len(docs)/2)
 
 print 'Totals'
 print 'True Positives: ' + str(truePosCount)
@@ -434,29 +417,44 @@ goldBlankRow = TElement('tr', parent=table)
 goldBlankRow.extend(TElement('th', text="Gold Standards:", parent=goldBlankRow))
 
 
-for label in confusionMatrix:
+values = sorted([str(key) for key in confusionMatrix.keys()])
+tdList = []
+for column in values:
     dataRow = TElement('tr', parent=table)
-    rowHeader = TElement('th', text=label, parent=dataRow)
+    rowHeader = TElement('th', text=column, parent=dataRow)
     blankData = TElement('td', parent=dataRow)
-    for comparison in confusionMatrix[label]:
-        comparisonData = [TElement('td', text=str(confusionMatrix[label][comparison])) for comparison in confusionMatrix[label]]
+    for row in values:
+        tdList.append(confusionMatrix[column][row])
+        comparisonData = [TElement('td', text=str(confusionMatrix[column][row])) for row in confusionMatrix[column]]
         for element in comparisonData:
             if element.text != '0':
                 element.attrib['style'] = "background:orange"
     dataRow.extend(comparisonData)
-
     
+##for label in confusionMatrix:
+##    dataRow = TElement('tr', parent=table)
+##    rowHeader = TElement('th', text=label, parent=dataRow)
+##    blankData = TElement('td', parent=dataRow)
+##    for comparison in confusionMatrix[label]:
+##        comparisonData = [TElement('td', text=str(confusionMatrix[label][comparison])) for comparison in confusionMatrix[label]]
+##        for element in comparisonData:
+##            if element.text != '0':
+##                element.attrib['style'] = "background:orange"
+##    dataRow.extend(comparisonData)
+
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
 
-# KWIC examination text to go here
+# KWIC examination text to go here in html
 
+# for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
 
+tostring(html)
 output = prettify(html)
 print(output) #just to take a look
 
 with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
     outputFile.write(output)
 
+print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
-
