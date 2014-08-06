@@ -170,7 +170,7 @@ for doc in docs:
         # Add multi-code entries as well:
         for entry in gsDic.keys():
             if entry in gsDic.keys() and entry in engDic.keys() and entry not in truePositives:
-                truePositives[entry] = tuple(code for code in engDic[entry])
+                truePositives[entry] = tuple(code for code in gsDic[entry])
             
         # Increments true positive counters in the confusion matrix
         for entry in gsDic.keys():
@@ -215,8 +215,7 @@ for doc in docs:
 ##            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
 ####            elif gsDic[entry] != engDic[entry]:
 ####                confusionMatrix[gsDic[entry]][engDic[entry]] += 1
-##
-##                
+        
 ##        # Increments false negative count
 ##        # Checks whether entries that exist in the gold standard exist in the engine
 ##        # If not, it's a false negative
@@ -282,29 +281,29 @@ for doc in docs:
 
         # Checking for overlap
 
-        print("************\nOverlap handling\n")
-        incompleteOverlaps = 0
-        completeOverlaps = 0
-        for gsKeyTup in gsDic.keys():
-            for i in range(len(gsKeyTup)):
-                for engKeyTup in engDic.keys():
-                    for j in range(len(engKeyTup)):
-                        # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
-                        if str(gsKeyTup[i]) == str(engKeyTup[j]):
-                            if str(gsKeyTup) == str(engKeyTup):
-                                completeOverlaps += 1
-                                print str(gsKeyTup)
-                                print str(engKeyTup)
-                                print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-                            else:
-                                incompleteOverlaps += 1
-                    if completeOverlaps > 0 or incompleteOverlaps > 0:
-                        print str(gsKeyTup) + " : " + str(engKeyTup)
-                        print str(gsDic[gsKeyTup]) + " : " + str(engDic[engKeyTup])
-                        print("/////////////////////")
-                        break
-                if incompleteOverlaps > 0 or completeOverlaps > 0:
-                    break
+##        print("************\nOverlap handling\n")
+##        incompleteOverlaps = 0
+##        completeOverlaps = 0
+##        for gsKeyTup in gsDic.keys():
+##            for i in range(len(gsKeyTup)):
+##                for engKeyTup in engDic.keys():
+##                    for j in range(len(engKeyTup)):
+##                        # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
+##                        if str(gsKeyTup[i]) == str(engKeyTup[j]):
+##                            if str(gsKeyTup) == str(engKeyTup):
+##                                completeOverlaps += 1
+##                                print str(gsKeyTup)
+##                                print str(engKeyTup)
+##                                print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+##                            else:
+##                                incompleteOverlaps += 1
+##                    if completeOverlaps > 0 or incompleteOverlaps > 0:
+##                        print str(gsKeyTup) + " : " + str(engKeyTup)
+##                        print str(gsDic[gsKeyTup]) + " : " + str(engDic[engKeyTup])
+##                        print("/////////////////////")
+##                        break
+##                if incompleteOverlaps > 0 or completeOverlaps > 0:
+##                    break
 
         print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
         print scopeMatchValueMismatch
@@ -381,7 +380,9 @@ class TElement(ET._Element):
             
 # Creating dom structure, adding proper headers and td's for each label of comparison
 
-html = TElement('html')
+root = TElement('root')
+
+html = TElement('html', parent=root)
 
 #Header
 head = TElement('head', parent=html)
@@ -397,6 +398,10 @@ head.extend(css)
 head.extend(title)
 
 #Body
+
+values = sorted([key for key in confusionMatrix.keys()])
+
+
 body = TElement('body', parent=html)
 
 h1 = TElement('h1', text="Deid Stats Results:", parent=body)
@@ -407,7 +412,7 @@ table = TElement('table', parent=body)
 
 headerRow = TElement('tr', parent=table)
 
-tableHeaders = [ TElement('th', text=goldLabel) for goldLabel in confusionMatrix]
+tableHeaders = [ TElement('th', text=column[0]) for column in values]
 
 headerRow.extend(TElement('th', parent=headerRow))
 headerRow.extend(TElement('th', text="Engine:", parent=headerRow))
@@ -416,45 +421,34 @@ headerRow.extend(tableHeaders)
 goldBlankRow = TElement('tr', parent=table)
 goldBlankRow.extend(TElement('th', text="Gold Standards:", parent=goldBlankRow))
 
-
-values = sorted([str(key) for key in confusionMatrix.keys()])
 tdList = []
 for column in values:
     dataRow = TElement('tr', parent=table)
-    rowHeader = TElement('th', text=column, parent=dataRow)
+    rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     for row in values:
-        tdList.append(confusionMatrix[column][row])
-        comparisonData = [TElement('td', text=str(confusionMatrix[column][row])) for row in confusionMatrix[column]]
-        for element in comparisonData:
-            if element.text != '0':
-                element.attrib['style'] = "background:orange"
+        #getting the td data for each row in pulling from the confusionMatrix dic
+        comparisonData = [TElement('td', text=str(confusionMatrix[column][row])) for row in values]
+        for tdElement in comparisonData:
+            if tdElement.text != '0':
+                tdElement.attrib['style'] = "background:orange"
+            dataRow.extend(tdElement)
+    dataRow.extend(rowHeader)
+    dataRow.extend(blankData)
     dataRow.extend(comparisonData)
-    
-##for label in confusionMatrix:
-##    dataRow = TElement('tr', parent=table)
-##    rowHeader = TElement('th', text=label, parent=dataRow)
-##    blankData = TElement('td', parent=dataRow)
-##    for comparison in confusionMatrix[label]:
-##        comparisonData = [TElement('td', text=str(confusionMatrix[label][comparison])) for comparison in confusionMatrix[label]]
-##        for element in comparisonData:
-##            if element.text != '0':
-##                element.attrib['style'] = "background:orange"
-##    dataRow.extend(comparisonData)
 
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
+
 
 # KWIC examination text to go here in html
 
 # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
 
-tostring(html)
-output = prettify(html)
-print(output) #just to take a look
-
 with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
-    outputFile.write(output)
+    for i in range(len(root)):
+        outputFile.write(ET.tostring(root[i]))
+outputFile.close()
 
 print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
