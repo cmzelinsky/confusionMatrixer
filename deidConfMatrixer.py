@@ -431,7 +431,7 @@ for column in values:
         comparisonData = [TElement('td', text=str(confusionMatrix[column][row])) for row in values]
         for tdElement in comparisonData:
             if tdElement.text != '0':
-                tdElement.attrib['style'] = "background:orange"
+                tdElement.attrib['style'] = "background:orange" # #00cd00 -- a nice green for true positives 
             dataRow.extend(tdElement)
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
