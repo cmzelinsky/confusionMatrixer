@@ -8,7 +8,7 @@ from lxml import etree
 import sys, os
 import codecs
 
-path = "C:/Users/courtney.zelinsky/Desktop/deid"
+path = sys.argv[1]
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
 
 def findPair(fname): 
@@ -21,7 +21,7 @@ output = []
     
 def KWIC(truePositivesMaster):
     for doc in truePositivesMaster:
-        parsedDoc = minidom.parse(path + '\\' + doc)
+        parsedDoc = minidom.parse(path + '/' + doc)
         paragraphs = []
         outputParagraph = []
         wordDict = {}
@@ -34,6 +34,10 @@ def KWIC(truePositivesMaster):
         for content in contents:
             wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
+        for i in range(len(wordDict)):
+            outputParagraph.append(wordDict['entry_' + str(i)])
+            
+        print len(outputParagraph)
         for entries in entryTuples:
             for entry in entries:
                 #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
@@ -41,74 +45,76 @@ def KWIC(truePositivesMaster):
                     #looking at each token
                     entryTuple = []
                     if 'entry_' + str(i) == entry:
-                        outputParagraph.append('<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>')
-                    else:
-                        outputParagraph.append(wordDict['entry_' + str(i)])
-                output.append(outputParagraph)
+                        outputParagraph[i] = '<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>'
+            #output.append(outputParagraph)
+
                     #execute thusly: for each word in the paragraph (text node in xpath: //content), append it to $paragraphs
                     #if the text node is one whose parent's attribute ID is equal to the entry number i'm looping through,
                     #bold or somehow html-tag that corresponding text by appending it with sth like:
-                    # <font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>
-    print output
+                    # <font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>'
+    finalOutput = "".join(outputParagraph)
+    print finalOutput
     #output should ideally look like the entire text of the document 
 
 KWIC(truePositivesMaster)
+
 
     #
     # HTML Output
     #
 
-##    class TElement(ET._Element):
-##    
-##    def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
-##        ET._Element.__init__(self, tag, dict(attrib, **extra))
-##        
-##        if text:
-##            self.text = text
-##        if tail:
-##            self.tail = tail
-##        if style:
-##            self.style = style
-##        if not parent == None:
-##            parent.append(self)
-##
-##    root = TElement('root')
-##    html = TElement('html', parent=root)
-##
-##    #Header
-##    head = TElement('head', parent=html)
-##
-##    title = TElement('title', text="Deid Stats Results", parent=head)
-##    css = TElement('link', parent=head)
-##
-##    css.attrib['href'] = "css.css"
-##    css.attrib['type'] = "text/css"
-##    css.attrib['rel'] = "stylesheet"
-##
-##    head.extend(css)
-##    head.extend(title)
-##
-##    #Body
-##
-##    values = sorted([key for key in confusionMatrix.keys()])
-##
-##
-##    body = TElement('body', parent=html)
-##
-##    h1 = TElement('h1', text="Deid Stats Results:", parent=body)
-##
-##    timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
-##
-##    table = TElement('table', parent=body)
-##
-##    authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
-##
-##
-##    # KWIC examination text to go here in html
-##
-##    # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
-##
-##    with open(os.path.join(path, ".html"), 'w') as outputFile:
-##        for i in range(len(root)):
-##            outputFile.write(ET.tostring(root[i]))
-##    outputFile.close()
+class TElement(ET._Element):
+
+def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
+    ET._Element.__init__(self, tag, dict(attrib, **extra))
+    
+    if text:
+        self.text = text
+    if tail:
+        self.tail = tail
+    if style:
+        self.style = style
+    if not parent == None:
+        parent.append(self)
+
+root = TElement('root')
+html = TElement('html', parent=root)
+
+#Header
+head = TElement('head', parent=html)
+
+title = TElement('title', text="Deid Stats Results", parent=head)
+css = TElement('link', parent=head)
+
+css.attrib['href'] = "css.css"
+css.attrib['type'] = "text/css"
+css.attrib['rel'] = "stylesheet"
+
+head.extend(css)
+head.extend(title)
+
+#Body
+
+values = sorted([key for key in confusionMatrix.keys()])
+
+
+body = TElement('body', parent=html)
+
+h1 = TElement('h1', text="Deid Stats Results:", parent=body)
+
+timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
+
+table = TElement('table', parent=body)
+
+authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
+
+
+# KWIC examination text to go here in html
+
+# for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
+
+with open(os.path.join(path, ".html"), 'w') as outputFile:
+    for i in range(len(root)):
+        outputFile.write(ET.tostring(root[i]))
+outputFile.close()
+

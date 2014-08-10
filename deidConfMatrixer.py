@@ -21,7 +21,7 @@ from xml.etree.ElementTree import Element, tostring, SubElement, XML
 
 
 startTime = datetime.datetime.now()
-##args = sys.argv
+#path = sys.argv[1]
 path = "C:/Users/courtney.zelinsky/Desktop/deid"
 
 if not os.path.exists(path):
@@ -127,24 +127,7 @@ for doc in docs:
             gsDic[k] = tuple(v)
                         
         # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
-
-
-##        contentNodes = parsedGSDoc.getElementsByTagName('content')
-##        for node in contentNodes:
-##            text = node.childNodes
-##            for node in text:
-##                if node.parentNode.getAttribute('ID') in gsDic1:
-##                    gsDic2[node.parentNode.getAttribute('ID')] = node.data
-        # {u'entry_202': u'January', u'entry_203': u'2012.', u'entry_303': u"Jude's", u'entry_302': u'St.'...}
         
-        ##for entry in gsEntryNumsOnly:
-        ##    for i in range(len(gsWorkingData)):
-        ##      if entry in gsWorkingData[i][0] and entry in gsDic2:
-        ##          finalGSDic[entry] = ((gsWorkingData[i][1], gsDic2[entry]))
-
-        # Don't need this if I can get the xpath module working ^^^
-        
-
         ## Establishing the engine data structures
         engDic = {}
         entries = parsedEngDoc.getElementsByTagName('entry')
@@ -197,9 +180,9 @@ for doc in docs:
 ##        # Checks whether entries that exist in the engine exist in the gold standard
 ##        # If not, it's a false positive
 ##        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
-##        for entry in engDic:
-##            # If value is in engine and not gs, increment
-##            if entry not in gsDic:
+        for entry in engDic:
+            # If value is in engine and not gs, increment
+            #if entry not in gsDic:
 ##                if "ENGINE_ONLY_ENTRY" in confusionMatrix:
 ##                    print "x1 engine only entry in confMatrix, so now incrementing"
 ##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
@@ -212,9 +195,9 @@ for doc in docs:
 ##                    print confusionMatrix["ENGINE_ONLY_ENTRY"]
 ##                    print "x1 engine only entry created, and now incrementing"
 ##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
-##            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
-####            elif gsDic[entry] != engDic[entry]:
-####                confusionMatrix[gsDic[entry]][engDic[entry]] += 1
+            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
+            if truePositives[entry] != engDic[entry]:
+                confusionMatrix[truePositives[entry]][engDic[entry]] += 1
         
 ##        # Increments false negative count
 ##        # Checks whether entries that exist in the gold standard exist in the engine
