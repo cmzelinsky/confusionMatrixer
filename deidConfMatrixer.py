@@ -2,7 +2,7 @@
 ## author : Courtney Zelinsky
 ## created : 5/13/14
 ##
-## Call on cmd line with arg[1] = gs, arg[2] = engine output for comparison to create a Confusion Matrix
+## Call on cmd line with arg[1] = path containing all files for testing, gs files in the format ~.xml and their engine counterparts ~.out.xml
 ##
 ## Henry's wishlist:
 ## "There were 2 minor warts I know of in the code.  
@@ -30,32 +30,26 @@ if not os.path.exists(path):
 def findPair(fname): 
     return fname[:-3] + 'out.xml'
 
-def getTextForKWIC(fname, entries):
-    '''Intake a nested dict of {filename:{gsLabel:{engineLabel:entryNums, ...}, ...} ...}
+def prettify(elem):
+    """Return a pretty-printed XML string for the Element.
+    """
+    rough_string = ET.tostring(elem, 'utf-8')
+    reparsed = minidom.parseString(rough_string)
+    return reparsed.toprettyxml(indent="  ")
 
-    '''
-    entries = entries.split(', ')
-    doc = minidom.parse(path + '\\' + fname)
-    docTemp = ET.parse(path + '\\' + fname)
-    concept = []
-    text = []
-    separator = '::::'
-    for entry in entries:
-        concept.append(docTemp.find('//content[@ID="' + entry + '"]', doc)[0].firstChild.nodeValue)
-    concept = ''.join(concept)[:-1]
-    for w in docTemp.find('//paragraph[.//content[@ID="' + entries[0] + '"]]', doc)[0].getElementsByTagName('content'):
-        if w.getAttribute('ID') in entries:
-            if not w.firstChild.localName == 'hit':
-                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.nodeValue + '</strong></font>')
-            else:
-                para.append('<font style="background-color:yellow"><strong>' + w.firstChild.firstChild.nodeValue + '</strong></font>')
-        else:
-            if not w.firstChild.localName == 'hit':
-                para.append(w.firstChild.nodeValue)
-            else:
-                para.append(w.firstChild.firstChild.nodeValue)
-    para = '<span onclick="showHide(this)" style="cursor:pointer">Context <span class="plusMinus">[+]</span></span><br><span style="display:none">' + ''.join(text) + '</span>'
-    return fname + separator + concept + separator + text
+class TElement(ET._Element):
+    """Extending elementtree's Element so as to accommodate text"""
+    def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
+        ET._Element.__init__(self, tag, dict(attrib, **extra))
+        
+        if text:
+            self.text = text
+        if tail:
+            self.tail = tail
+        if style:
+            self.style = style
+        if not parent == None:
+            parent.append(self)
 
 ## Begin processing...
 docCount=0
@@ -94,11 +88,11 @@ for doc in docs:
 
         # Creates rows and columns for the matrix labeled with codes(matrixValues)
         # Instantiates each false/true positive count to 0
-        #confusionMatrix[doc] = {}
+        confusionMatrix[doc] = {}
         for value in matrixValues:
-            confusionMatrix[value] = {}
+            confusionMatrix[doc][value] = {}
             for value2 in matrixValues:
-                confusionMatrix[value][value2] = 0
+                confusionMatrix[doc][value][value2] = 0
 
         def collectText(doc):
             doc = ET.parse(path + '\\' + fname)
@@ -139,7 +133,7 @@ for doc in docs:
                     entries = tuple(str(binding) for binding in bindings if len(binding)>0)
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     if entries in engDic:
-                        engDic[entries].append(str(value).strip('[]'))
+                        engDic[entries].append("".join(value))
                     else:
                         engDic[entries] = value
         for k, v in engDic.items():
@@ -158,15 +152,15 @@ for doc in docs:
         # Increments true positive counters in the confusion matrix
         for entry in gsDic.keys():
             if entry in truePositives and truePositives[entry] == gsDic[entry]:
-                if truePositives[entry] in confusionMatrix and truePositives[entry] in confusionMatrix[truePositives[entry]]:
+                if truePositives[entry] in confusionMatrix[doc] and truePositives[entry] in confusionMatrix[doc][truePositives[entry]]:
                     #if entry in engDic and engDic[entry] == gsDic[entry] # If the value exists, increment it
-                   confusionMatrix[truePositives[entry]][truePositives[entry]] += 1
+                   confusionMatrix[doc][truePositives[entry]][truePositives[entry]] += 1
                 # If the value doesn't exist, add another row/column for it
                 else:
-                    confusionMatrix[truePositives[entry]] = {}
+                    confusionMatrix[doc][truePositives[entry]] = {}
                     for value2 in matrixValues:
-                        confusionMatrix[truePositives[entry]][value2] = 0
-                    confusionMatrix[truePositives[entry]][truePositives[entry]] = 1
+                        confusionMatrix[doc][truePositives[entry]][value2] = 0
+                    confusionMatrix[doc][truePositives[entry]][truePositives[entry]] = 1
         print "True Positives: (x%s found!)\n" % len(truePositives)
         truePosCount += len(truePositives)
         print truePositives
@@ -176,13 +170,14 @@ for doc in docs:
         gsDiffs = {entry:gsDic[entry] for entry in gsDic if entry not in engDic}
         engDiffs = {entry:engDic[entry] for entry in engDic if entry not in gsDic}
 
-##        # Increments false positive count
-##        # Checks whether entries that exist in the engine exist in the gold standard
-##        # If not, it's a false positive
-##        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
+        # Increments false positive count
+        # Checks whether entries that exist in the engine exist in the gold standard
+        # If not, it's a false positive
+        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
         for entry in engDic:
             # If value is in engine and not gs, increment
-            #if entry not in gsDic:
+            if entry not in gsDic:
+                pass
 ##                if "ENGINE_ONLY_ENTRY" in confusionMatrix:
 ##                    print "x1 engine only entry in confMatrix, so now incrementing"
 ##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
@@ -195,9 +190,16 @@ for doc in docs:
 ##                    print confusionMatrix["ENGINE_ONLY_ENTRY"]
 ##                    print "x1 engine only entry created, and now incrementing"
 ##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
-            # If entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
-            if truePositives[entry] != engDic[entry]:
-                confusionMatrix[truePositives[entry]][engDic[entry]] += 1
+            # Non-matching codes handling
+            else:
+                #if the entry numbers exist in both but the engineDic has a multi-code entry...
+                if len(engDic[entry]) > 1:
+                    for code in engDic[entry]:
+                        if code not in gsDic[entry]:
+                            confusionMatrix[doc][truePositives[entry]][(code,)] +=1
+                # Otherwise, entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
+                elif truePositives[entry] != engDic[entry]:
+                    confusionMatrix[doc][truePositives[entry]][engDic[entry]] += 1
         
 ##        # Increments false negative count
 ##        # Checks whether entries that exist in the gold standard exist in the engine
@@ -264,7 +266,7 @@ for doc in docs:
 
         # Checking for overlap
 
-##        print("************\nOverlap handling\n")
+##        print("\nOverlap handling\n")
 ##        incompleteOverlaps = 0
 ##        completeOverlaps = 0
 ##        for gsKeyTup in gsDic.keys():
@@ -329,37 +331,11 @@ print 'False Positives: ' + str(falsePosCount)
 # HTML Output
 #
 
-#vals = ['LAST_NAME', 'MALE_NAME', 'FEMALE_NAME', 'PHONE_NUMBER', 'MEDICAL_RECORD_NUMBER', 'ABSOLUTE_DATE', 'DATE',
-#        'ADDRESS', 'LOCATION', 'AGE', 'SOCIAL_SECURITY_NUMBER', 'CERTIFICATE_OR_LICENSE_NUMBER', 'ID_OR_OTHER_CODE',
-#        'NAME', 'ORGANIZATION', 'URL', 'E_MAIL_ADDRESS', 'TIME', 'OTHER']
- 
-
-##    out.write('<h3>Total correct: ' + str(len(truePositives)) + '</h3>')
+##out.write('<h3>Total correct: ' + str(len(truePositives)) + '</h3>')
 ##    out.write('<h3>Total errors: ' + str(falsePosCount+falseNegCount) + ' </h3>')
 ##    out.write('<h3>Total GS MIMs: ' + str(len(gsDic)) + '</h3>')
 ##    out.write('<h3>Total Engine MIMs: ' + str(len(engDic)) + '</h3></td></tr></table>')
 
-
-def prettify(elem):
-    """Return a pretty-printed XML string for the Element.
-    """
-    rough_string = ET.tostring(elem, 'utf-8')
-    reparsed = minidom.parseString(rough_string)
-    return reparsed.toprettyxml(indent="  ")
-
-class TElement(ET._Element):
-    
-    def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
-        ET._Element.__init__(self, tag, dict(attrib, **extra))
-        
-        if text:
-            self.text = text
-        if tail:
-            self.tail = tail
-        if style:
-            self.style = style
-        if not parent == None:
-            parent.append(self)
             
 # Creating dom structure, adding proper headers and td's for each label of comparison
 
