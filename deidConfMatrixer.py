@@ -18,6 +18,7 @@ from xml.dom import minidom
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from xml.etree.ElementTree import Element, tostring, SubElement, XML
+from collections import Counter
 
 
 startTime = datetime.datetime.now()
@@ -317,9 +318,26 @@ for doc in docs:
 ##                        scopeMismatchValueMatch.append(engineDiffsList[j]);
 ##        print "Scoping was problematic involving %s MIMs, which were:" % len(scopeMismatchValueMatch)
 ##        print scopeMismatchValueMatch
-        
 
+        # Totals
+        finalData = {}
+        # initialize final data with 0-counts
+        for value in matrixValues:
+            finalData[value] = {}
+            for value2 in matrixValues:
+                    finalData[value][value2] = 0
+                    
+        lastCount = Counter()   
+        allMimCounts = [confusionMatrix[doc] for doc in confusionMatrix]
+        counterMimCounts = [Counter(x) for x in allMimCounts]
+        for count in counterMimCounts:
+            for row in count.itervalues():
+                for column in row:
+                    finalData[count][row] += column
 
+        #find a way to preserve next level up values ; __ ;
+
+# Final Report
 
 print 'Totals'
 print 'True Positives: ' + str(truePosCount)
