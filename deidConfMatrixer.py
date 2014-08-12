@@ -320,6 +320,7 @@ for doc in docs:
 ##        print scopeMismatchValueMatch
 
         # Totals
+        
         finalData = {}
         # initialize final data with 0-counts
         for value in matrixValues:
@@ -327,15 +328,13 @@ for doc in docs:
             for value2 in matrixValues:
                     finalData[value][value2] = 0
                     
-        lastCount = Counter()   
-        allMimCounts = [confusionMatrix[doc] for doc in confusionMatrix]
-        counterMimCounts = [Counter(x) for x in allMimCounts]
-        for count in counterMimCounts:
-            for row in count.itervalues():
-                for column in row:
-                    finalData[count][row] += column
+        #summing totals for each gsKey
+        for doc in confusionMatrix:
+            for key in confusionMatrix[doc]:
+                for secondKey in confusionMatrix[doc][key]:
+                    if key in finalData and secondKey in finalData[key]:
+                        finalData[key][secondKey] += confusionMatrix[doc][key][secondKey]
 
-        #find a way to preserve next level up values ; __ ;
 
 # Final Report
 
@@ -376,7 +375,7 @@ head.extend(title)
 
 #Body
 
-values = sorted([key for key in confusionMatrix.keys()])
+values = sorted([key for key in confusionMatrix[doc].keys() for doc in confusionMatrix])
 
 
 body = TElement('body', parent=html)
@@ -405,7 +404,7 @@ for column in values:
     blankData = TElement('td', parent=dataRow)
     for row in values:
         #getting the td data for each row in pulling from the confusionMatrix dic
-        comparisonData = [TElement('td', text=str(confusionMatrix[column][row])) for row in values]
+        comparisonData = [TElement('td', text=str(finalData[column][row])) for row in values]
         for tdElement in comparisonData:
             if tdElement.text != '0':
                 tdElement.attrib['style'] = "background:orange" # #00cd00 -- a nice green for true positives 
