@@ -9,7 +9,6 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.
 ## 2)	There is no link from confusion matrix to details files."
 ##
-
 import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
@@ -38,7 +37,7 @@ def prettify(elem):
 
 truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
-#Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{
+#Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
 
 def KWIC(truePositivesMaster):
     """Creates readable xhtml output  """
@@ -172,12 +171,11 @@ for doc in docs:
             bindings = []
             for child in entry.firstChild.childNodes:
                 if child.localName == 'binding':
-                    print bindings
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
                     entries = tuple(str(binding) for binding in bindings if len(binding)>0)
-                    print entries 
+                    #print entries 
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    print value
+                    #print value
                     if entries in gsDic:
                         gsDic[entries].append(str(value).strip('[]'))
                     else:
@@ -226,7 +224,7 @@ for doc in docs:
                     for value2 in matrixValues:
                         confusionMatrix[doc][truePositives[entry]][value2] = 0
                     confusionMatrix[doc][truePositives[entry]][truePositives[entry]] = 1
-        print "True Positives: (x%s found!)\n" % len(truePositives)
+        print "\n\nTrue Positives: (x%s found!)\n" % len(truePositives)
         truePosCount += len(truePositives)
         print truePositives
         
@@ -277,7 +275,7 @@ for doc in docs:
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
 
-        print "\n\nDifferences in engine versus gold standard:"
+        print "\n\nDifferences in engine versus gold standard - " + doc + ":"
         print "_____________________________________________\n"
         print "In gold standard version but not in engine version (false negatives): (x%s found)" % len(gsDiffs)
         falseNegCount += len(gsDiffs)
@@ -404,6 +402,9 @@ print 'True Positives: ' + str(truePosCount)
 print 'False Negatives: ' + str(falseNegCount)
 print 'False Positives: ' + str(falsePosCount)
 
+print 'Precision (TP/TP+FP): ' + str(float(truePosCount)/float(truePosCount+falsePosCount))
+print 'Recall (TP/TP+FN): ' + str(float(truePosCount)/float(truePosCount+falseNegCount))
+
 
 #
 # HTML Output
@@ -444,6 +445,14 @@ body = TElement('body', parent=html)
 h1 = TElement('h1', text="Deid Stats Results:", parent=body)
 
 timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
+
+baseStats = TElement('p', parent=body)
+
+truePos = TElement('p', text='True Positives: ' + str(truePosCount), parent=baseStats)
+falseNegs = TElement('p', text='False Negatives: ' + str(falseNegCount), parent=baseStats)
+falsePos = TElement('p', text='False Positives: ' + str(falsePosCount), parent=baseStats)
+precision = TElement('p', text='Precision (TPs/TPs+FPs): ' + str(float(truePosCount)/float(truePosCount+falsePosCount)), parent=baseStats)
+recall = TElement('p', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
 
 table = TElement('table', parent=body)
 
