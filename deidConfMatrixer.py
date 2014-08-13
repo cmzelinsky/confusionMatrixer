@@ -18,8 +18,6 @@ from xml.dom import minidom
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from xml.etree.ElementTree import Element, tostring, SubElement, XML
-from collections import Counter
-
 
 startTime = datetime.datetime.now()
 #path = sys.argv[1]
@@ -37,6 +35,76 @@ def prettify(elem):
     rough_string = ET.tostring(elem, 'utf-8')
     reparsed = minidom.parseString(rough_string)
     return reparsed.toprettyxml(indent="  ")
+
+truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
+#just using truePositives for testing here, but this will be the format when an error dictionary is established
+#Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{
+
+def KWIC(truePositivesMaster):
+    """Creates readable xhtml output  """
+    root = TElement('root')
+    html = TElement('html', parent=root)
+    html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
+
+    #Header
+    head = TElement('head', parent=html)
+    title = TElement('title', text="Deid Stats Results", parent=head)
+    css = TElement('link', parent=head)
+    
+    css.attrib['href'] = "css.css"
+    css.attrib['type'] = "text/css"
+    css.attrib['rel'] = "stylesheet"
+
+    head.extend(css)
+    head.extend(title)
+
+    #Body
+    values = sorted([key for key in confusionMatrix.keys()])
+    body = TElement('body', parent=html)
+    h1 = TElement('h1', text="Error contexts:", parent=body)
+    
+    for doc in truePositivesMaster:
+        parsedDoc = minidom.parse(path + '/' + doc)
+        paragraphs = []
+        outputParagraph = []
+        wordDict = {}
+        #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
+        contents = parsedDoc.getElementsByTagName('content')
+        #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
+        entryTuples = [entryTuples for entryTuples in truePositivesMaster[doc]]
+        #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
+        
+        for content in contents:
+            wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
+            #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
+        for i in range(len(wordDict)):
+            outputParagraph.append(wordDict['entry_' + str(i)])
+        for entries in entryTuples:
+            for entry in entries:
+                #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
+                for i in range(len(wordDict)):
+                    #looking at each token
+                    entryTuple = []
+                    if 'entry_' + str(i) == entry:
+                        outputParagraph[i] = '<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>'
+                        
+    output = '<context>' + "".join(outputParagraph) + '</context>'
+    finalOutput = ET.XML(output)
+
+    print ET.tostring(finalOutput)#<context>
+    
+    allContextsPerDoc = TElement('table', parent=body)
+    allContextsPerDoc.extend(finalOutput)
+    
+    authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
+
+    # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
+    with open(os.path.join(path, "KWIC_out.xhtml"), 'w') as outputFile:
+        for i in range(len(root)):
+            outputFile.write(ET.tostring(root[i]))
+    outputFile.close()
+
+
 
 class TElement(ET._Element):
     """Extending elementtree's Element so as to accommodate text"""
@@ -60,10 +128,11 @@ truePosCount = 0
 falseNegCount = 0
 falsePosCount = 0
 confusionMatrix = {}
+errorDic = {}
 
 
 matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
-(u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_OTHER_CODE',), (u'NAME',),
+(u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
 (u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',)]
 
 for doc in docs:
@@ -77,16 +146,15 @@ for doc in docs:
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngDoc = parse(findPair(path + '\\' + doc))
         
-        gsCodes = []
-        gsEntryNumsOnly = []
-        gsEntryNums = []
-        gsDic2 = {}
-        finalGSDic = {}
-        gsParent = []
         outputList = []
         documentText = {}
-        #engAndGsOnly[doc] = {}
-
+        
+        errorDic[doc] = {}
+        for value in matrixValues:
+            errorDic[doc][value] = {}
+            for value2 in matrixValues:
+                errorDic[doc][value][value2] = 0
+                
         # Creates rows and columns for the matrix labeled with codes(matrixValues)
         # Instantiates each false/true positive count to 0
         confusionMatrix[doc] = {}
@@ -94,10 +162,6 @@ for doc in docs:
             confusionMatrix[doc][value] = {}
             for value2 in matrixValues:
                 confusionMatrix[doc][value][value2] = 0
-
-        def collectText(doc):
-            doc = ET.parse(path + '\\' + fname)
-            
         
         # Establishing the gold standard data structures
         
@@ -178,19 +242,16 @@ for doc in docs:
         for entry in engDic:
             # If value is in engine and not gs, increment
             if entry not in gsDic:
-                pass
-##                if "ENGINE_ONLY_ENTRY" in confusionMatrix:
-##                    print "x1 engine only entry in confMatrix, so now incrementing"
-##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
-##                else:
-##                    print "no engine only entry found for this dic in confmatrix, now making a new dic"
-##                    confusionMatrix["ENGINE_ONLY_ENTRY"] = {}
-##                    for value in matrixValues:
-##                        print "now initializing code from matrixValues to zero"
-##                        confusionMatrix["ENGINE_ONLY_ENTRY"][value] = 0
-##                    print confusionMatrix["ENGINE_ONLY_ENTRY"]
-##                    print "x1 engine only entry created, and now incrementing"
-##                    confusionMatrix["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+                if "ENGINE_ONLY_ENTRY" in errorDic[doc]:
+                    print "x1 engine only entry in confMatrix, so now incrementing"
+                    errorDic["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+                else:
+                    #no engine only entry found for this dic in confmatrix, making a new dic
+                    errorDic["ENGINE_ONLY_ENTRY"] = {}
+                    for value in matrixValues:
+                        #initialize code from matrixValues to zero"
+                        errorDic["ENGINE_ONLY_ENTRY"][value] = 0
+                    errorDic["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
             # Non-matching codes handling
             else:
                 #if the entry numbers exist in both but the engineDic has a multi-code entry...
@@ -206,12 +267,12 @@ for doc in docs:
 ##        # Checks whether entries that exist in the gold standard exist in the engine
 ##        # If not, it's a false negative
 ##        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
-##        for entry in gsDic:
-##            if entry not in engDic:
-##                if "GS_ONLY_ENTRY" in confusionMatrix[gsDic[entry]]:
-##                    confusionMatrix[gsDic[entry]]["GS_ONLY_ENTRY"] += 1
-##                else:
-##                    confusionMatrix[gsDic[entry]]["GS_ONLY_ENTRY"] = 1
+        for entry in gsDic:
+            if entry not in engDic:
+                if "GS_ONLY_ENTRY" in errorDic[gsDic[entry]]:
+                    errorDic[doc][gsDic[entry]]["GS_ONLY_ENTRY"] += 1
+                else:
+                    errorDic[gsDic[entry]]["GS_ONLY_ENTRY"] = 1
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
@@ -375,7 +436,7 @@ head.extend(title)
 
 #Body
 
-values = sorted([key for key in confusionMatrix[doc].keys() for doc in confusionMatrix])
+values = sorted([key for key in finalData.keys()])
 
 
 body = TElement('body', parent=html)
@@ -402,6 +463,7 @@ for column in values:
     dataRow = TElement('tr', parent=table)
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
+    blankData.attrib['style'] = "border:0px"
     for row in values:
         #getting the td data for each row in pulling from the confusionMatrix dic
         comparisonData = [TElement('td', text=str(finalData[column][row])) for row in values]
@@ -428,3 +490,5 @@ outputFile.close()
 
 print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
+
+KWIC(truePositivesMaster)
