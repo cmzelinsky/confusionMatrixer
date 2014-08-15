@@ -9,7 +9,7 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.
 ## 2)	There is no link from confusion matrix to details files."
 ##
-import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections
+import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections, repr
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
@@ -17,6 +17,9 @@ from xml.dom import minidom
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import ElementTree
 from xml.etree.ElementTree import Element, tostring, SubElement, XML
+from xml.etree.ElementTree import XMLParser
+from lxml import etree
+
 
 startTime = datetime.datetime.now()
 #path = sys.argv[1]
@@ -35,11 +38,15 @@ def prettify(elem):
     reparsed = minidom.parseString(rough_string)
     return reparsed.toprettyxml(indent="  ")
 
-truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
+#truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
 
+
 def KWIC(truePositivesMaster):
+
+    parser = XMLParser(encoding="utf-8")
+    
     """Creates readable xhtml output  """
     root = TElement('root')
     html = TElement('html', parent=root)
@@ -61,48 +68,64 @@ def KWIC(truePositivesMaster):
     values = sorted([key for key in confusionMatrix.keys()])
     body = TElement('body', parent=html)
     h1 = TElement('h1', text="Error contexts:", parent=body)
+
+    output = []
     
-    for doc in truePositivesMaster:
-        parsedDoc = minidom.parse(path + '/' + doc)
+    for doc in errors:
+        parsedDoc = minidom.parse(findPair(path + '\\' + doc))
         paragraphs = []
         outputParagraph = []
         wordDict = {}
         #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
         contents = parsedDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
-        entryTuples = [entryTuples for entryTuples in truePositivesMaster[doc]]
+        entryTuples = [entryTuples for entryTuples in errors[doc]['FN']]
+        entryTuples.extend([entryTuples for entryTuples in errors[doc]['FP']])
+
+        print "entryTuples: ", entryTuples
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
         
         for content in contents:
-            wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
+            if content.firstChild is not None:
+                wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
         for i in range(len(wordDict)):
-            outputParagraph.append(wordDict['entry_' + str(i)])
-        for entries in entryTuples:
-            for entry in entries:
-                #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
-                for i in range(len(wordDict)):
-                    #looking at each token
-                    entryTuple = []
-                    if 'entry_' + str(i) == entry:
-                        outputParagraph[i] = '<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>'
-                        
-    output = '<context>' + "".join(outputParagraph) + '</context>'
-    finalOutput = ET.XML(output)
+            #getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' type of thing
+            if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
+                if '&' in wordDict['entry_' + str(i)]:
+                    outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
+                else:
+                    outputParagraph.append(wordDict['entry_' + str(i)])
+        for entry in entryTuples:
+            #for entry in entries:
+            #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
+            for i in range(len(wordDict)):
+                #looking at each token
+                entryTuple = []
+                if 'entry_' + str(i) == entry:
+                    outputParagraph[i] = '<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>'
+        output.append('<context>' + "".join(outputParagraph) + '</context>')
 
-    print ET.tostring(finalOutput)#<context>
+    output = "<root>" + "".join(output) + "</root>"
+
+    allContexts = path + "allContexts.xhtml"
     
+    with open(os.path.join(path, allContexts), 'w') as allContextsXML:
+        allContextsXML.write(output)
+    allContextsXML.close()
+
+    finalOutput = ET.parse(allContexts, parser=parser)
+
+    print ET.dump(finalOutput[0]) #<context>
+        
     allContextsPerDoc = TElement('table', parent=body)
     allContextsPerDoc.extend(finalOutput)
-    
-    authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
 
     # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
     with open(os.path.join(path, "KWIC_out.xhtml"), 'w') as outputFile:
         for i in range(len(root)):
             outputFile.write(ET.tostring(root[i]))
     outputFile.close()
-
 
 
 class TElement(ET._Element):
@@ -128,6 +151,7 @@ falseNegCount = 0
 falsePosCount = 0
 confusionMatrix = {}
 errorDic = {}
+errors = {}
 
 
 matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
@@ -230,8 +254,16 @@ for doc in docs:
         
         # Checking for false positives, false negatives, and mismatches...
 
+        #False negatives:
         gsDiffs = {entry:gsDic[entry] for entry in gsDic if entry not in engDic}
+        #False positives: 
         engDiffs = {entry:engDic[entry] for entry in engDic if entry not in gsDic}
+
+        errors[doc] = {}
+        errors[doc]["FN"] = {}
+        errors[doc]["FN"] = gsDiffs
+        errors[doc]["FP"] = {}
+        errors[doc]["FP"] = engDiffs
 
         # Increments false positive count
         # Checks whether entries that exist in the engine exist in the gold standard
@@ -500,4 +532,4 @@ outputFile.close()
 print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
 
-KWIC(truePositivesMaster)
+KWIC(errors)
