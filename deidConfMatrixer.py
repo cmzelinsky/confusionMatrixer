@@ -44,10 +44,11 @@ def prettify(elem):
 
 
 def KWIC(truePositivesMaster):
-
+    """Creates readable xhtml output  """
+    
     parser = XMLParser(encoding="utf-8")
     
-    """Creates readable xhtml output  """
+
     root = TElement('root')
     html = TElement('html', parent=root)
     html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
@@ -90,7 +91,7 @@ def KWIC(truePositivesMaster):
                 wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
         for i in range(len(wordDict)):
-            #getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' type of thing
+            #getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document -- removed these 
             if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
                 if '&' in wordDict['entry_' + str(i)]:
                     outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
@@ -103,10 +104,10 @@ def KWIC(truePositivesMaster):
                 #looking at each token
                 entryTuple = []
                 if 'entry_' + str(i) == entry:
-                    outputParagraph[i] = '<font style="background-color:yellow"><strong>' + wordDict['entry_' + str(i)] + '</strong></font>'
-        output.append('<context>' + "".join(outputParagraph) + '</context>')
+                    outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+        output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
-    output = "<root>" + "".join(output) + "</root>"
+    output = "<contexts>" + "".join(output) + "</contexts>"
 
     allContexts = path + "allContexts.xhtml"
     
@@ -114,12 +115,17 @@ def KWIC(truePositivesMaster):
         allContextsXML.write(output)
     allContextsXML.close()
 
+    #reparsing the output so as to proceed to add it to a final xhtml format:
     finalOutput = ET.parse(allContexts, parser=parser)
 
-    print ET.dump(finalOutput[0]) #<context>
+    allContextsPerDoc = finalOutput.findall('context')
         
-    allContextsPerDoc = TElement('table', parent=body)
-    allContextsPerDoc.extend(finalOutput)
+    allContextsTable = TElement('table', parent=body)
+
+    for context in allContextsPerDoc:
+        allContextsTable.append(TElement('h3', text=context.get('doc')))
+        allContextsTable.append(context)
+        allContextsTable.append(TElement('p', parent=allContextsTable))
 
     # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
     with open(os.path.join(path, "KWIC_out.xhtml"), 'w') as outputFile:
@@ -129,7 +135,7 @@ def KWIC(truePositivesMaster):
 
 
 class TElement(ET._Element):
-    """Extending elementtree's Element so as to accommodate text"""
+    """Extending elementtree's Element class so as to accommodate text"""
     def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
         ET._Element.__init__(self, tag, dict(attrib, **extra))
         
@@ -464,13 +470,15 @@ css.attrib['href'] = "css.css"
 css.attrib['type'] = "text/css"
 css.attrib['rel'] = "stylesheet"
 
+#jquery = TElement('script', parent=head)
+#jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+
 head.extend(css)
 head.extend(title)
+#head.extend(jquery)
 
 #Body
-
 values = sorted([key for key in finalData.keys()])
-
 
 body = TElement('body', parent=html)
 
@@ -491,6 +499,9 @@ table = TElement('table', parent=body)
 headerRow = TElement('tr', parent=table)
 
 tableHeaders = [ TElement('th', text=column[0]) for column in values]
+for th in tableHeaders:
+    th.attrib['class'] = "resizable"
+    #So as to set this up for a nice resizing feature with jquery
 
 headerRow.extend(TElement('th', parent=headerRow))
 headerRow.extend(TElement('th', text="Engine:", parent=headerRow))
@@ -510,7 +521,9 @@ for column in values:
         comparisonData = [TElement('td', text=str(finalData[column][row])) for row in values]
         for tdElement in comparisonData:
             if tdElement.text != '0':
-                tdElement.attrib['style'] = "background:orange" # #00cd00 -- a nice green for true positives 
+                tdElement.attrib['style'] = "background: #ed6e00" # #00cd00 -- a nice green for true positives
+            else:
+                tdElement.attrib['style'] = "background: white; color: #0962ac;"
             dataRow.extend(tdElement)
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
