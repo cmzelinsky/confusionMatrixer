@@ -3,7 +3,7 @@ table{
 	padding: 10px;
 }
 	
-th{
+th, h3{
 	background: #ed6e00;
 	color:white;
 	padding: 5px;

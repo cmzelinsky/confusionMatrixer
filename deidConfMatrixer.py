@@ -31,13 +31,6 @@ if not os.path.exists(path):
 def findPair(fname): 
     return fname[:-3] + 'out.xml'
 
-def prettify(elem):
-    """Return a pretty-printed XML string for the Element.
-    """
-    rough_string = ET.tostring(elem, 'utf-8')
-    reparsed = minidom.parseString(rough_string)
-    return reparsed.toprettyxml(indent="  ")
-
 #truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
@@ -62,8 +55,12 @@ def KWIC(truePositivesMaster):
     css.attrib['type'] = "text/css"
     css.attrib['rel'] = "stylesheet"
 
+    jquery = TElement('script', text="//", parent=head)
+    jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+
     head.extend(css)
     head.extend(title)
+    head.extend(jquery)
 
     #Body
     values = sorted([key for key in confusionMatrix.keys()])
@@ -100,11 +97,17 @@ def KWIC(truePositivesMaster):
         for entry in entryTuples:
             #for entry in entries:
             #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
+            entryTuple = [subentry for subentry in entry if len(entry) > 1]
+            print "entryTuple", entryTuple
             for i in range(len(wordDict)):
                 #looking at each token
-                entryTuple = []
-                if 'entry_' + str(i) == entry:
-                    outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                
+                if 'entry_' + str(i) == entry: #or 'entry_' + str(i) == entry in:
+                    tempEntry = 'entry_' + str(i) #so as to avoid this string / tuple concatenation error below
+                    if entry in errors[doc]['FP']:
+                        outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="' + str(errors[doc]['FP'][(entry,)])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                    elif entry in errors[doc]['FN']:
+                        outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="' + str(errors[doc]['FN'][(entry,)])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
     output = "<contexts>" + "".join(output) + "</contexts>"
@@ -307,8 +310,10 @@ for doc in docs:
             if entry not in engDic:
                 if "GS_ONLY_ENTRY" in errorDic[gsDic[entry]]:
                     errorDic[doc][gsDic[entry]]["GS_ONLY_ENTRY"] += 1
+                    print "found a GS ONLY ENTRY!!"
                 else:
                     errorDic[gsDic[entry]]["GS_ONLY_ENTRY"] = 1
+                    print "initialized a GS ONLY ENTRY"
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
@@ -332,8 +337,8 @@ for doc in docs:
         engDiffsEntries = engineDiffsEntries
         
         # Checking for scope match, value mismatch (Same entry number, different code value):
-        print "\n\nScope Match - Value Mismatch MIMs:"
-        print "_____________________________________________\n"
+        #print "\n\nScope Match - Value Mismatch MIMs:"
+        #print "_____________________________________________\n"
 
         scopeMatchValueMismatch = []
         """
@@ -388,9 +393,9 @@ for doc in docs:
 ##                if incompleteOverlaps > 0 or completeOverlaps > 0:
 ##                    break
 
-        print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
-        print scopeMatchValueMismatch
-        print "\n"
+        #print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
+        #print scopeMatchValueMismatch
+        #print "\n"
         scopeMatchValueMismatchEntryNums = [entryNum for entryNum in scopeMatchValueMismatch]
         entryJustNumsList = []
         for entry in scopeMatchValueMismatchEntryNums:
@@ -470,31 +475,34 @@ css.attrib['href'] = "css.css"
 css.attrib['type'] = "text/css"
 css.attrib['rel'] = "stylesheet"
 
-#jquery = TElement('script', parent=head)
-#jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+jquery = TElement('script', text="//", parent=head)
+jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+
+doughnutChart = TElement('script', text="//", parent=head)
+doughnutChart.attrib['src'] = "doughnut.js"
 
 head.extend(css)
 head.extend(title)
-#head.extend(jquery)
+head.extend(jquery)
+
+
+
 
 #Body
+
 values = sorted([key for key in finalData.keys()])
 
 body = TElement('body', parent=html)
+
+
 
 h1 = TElement('h1', text="Deid Stats Results:", parent=body)
 
 timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
 
-baseStats = TElement('p', parent=body)
-
-truePos = TElement('p', text='True Positives: ' + str(truePosCount), parent=baseStats)
-falseNegs = TElement('p', text='False Negatives: ' + str(falseNegCount), parent=baseStats)
-falsePos = TElement('p', text='False Positives: ' + str(falsePosCount), parent=baseStats)
-precision = TElement('p', text='Precision (TPs/TPs+FPs): ' + str(float(truePosCount)/float(truePosCount+falsePosCount)), parent=baseStats)
-recall = TElement('p', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
 
 table = TElement('table', parent=body)
+table.attrib['class'] = "ellipsable"
 
 headerRow = TElement('tr', parent=table)
 
@@ -508,7 +516,7 @@ headerRow.extend(TElement('th', text="Engine:", parent=headerRow))
 headerRow.extend(tableHeaders)
 
 goldBlankRow = TElement('tr', parent=table)
-goldBlankRow.extend(TElement('th', text="Gold Standards:", parent=goldBlankRow))
+goldBlankRow.extend(TElement('th', text="Golds:", parent=goldBlankRow))
 
 tdList = []
 for column in values:
@@ -524,10 +532,43 @@ for column in values:
                 tdElement.attrib['style'] = "background: #ed6e00" # #00cd00 -- a nice green for true positives
             else:
                 tdElement.attrib['style'] = "background: white; color: #0962ac;"
+        
             dataRow.extend(tdElement)
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
+
+
+emptySpacing = TElement('p', parent=body)
+
+falsePositivesData = '[{title:"Absolute Date", value:20, color: "#2C3E50"}, {title:"Date", value:80, color: "#FC4349" }, {title: "Age", value: 70, color: "#6DBCDB"}, {title: "Medical Record Number", value: 50, color: "#F7E248"}, {title: "Hospital", value: 40, color: "#D7DADB"}]'
+
+falsePosScriptBody = '$(function(){$("#doughnutChart").drawDoughnutChart(' + falsePositivesData + ');});'
+falsePosScript = TElement('script', text=falsePosScriptBody, parent=body)
+
+stats = TElement('table', parent=body)
+stats.attrib['style'] = "border:0px"
+
+baseStats = TElement('tr', parent=stats)
+
+truePos = TElement('th', text='True Positives: ' + str(truePosCount), parent=baseStats)
+falseNegs = TElement('th', text='False Negatives: ' + str(falseNegCount), parent=baseStats)
+precision = TElement('th', text='Precision (TPs/TPs+FPs): ' + str(float(truePosCount)/float(truePosCount+falsePosCount)), parent=baseStats)
+recall = TElement('th', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
+
+
+falsePos = TElement('th', parent=baseStats)
+
+overlayForStats = TElement('div', parent=body)
+overlayForStats.attrib['id'] = "overlay"
+
+openFalsePos = TElement('a', text='False Positives: ' + str(falsePosCount), parent=falsePos)
+openFalsePos.attrib['onclick'] = "document.getElementById('overlay').style.display='block';"
+openFalsePos.attrib['href'] = "javascript:void(0)"
+
+falsePosSVG = TElement('div', parent=overlayForStats)
+falsePosSVG.attrib['id'] = "doughnutChart"
+falsePosSVG.attrib['class'] = "chart"
 
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
