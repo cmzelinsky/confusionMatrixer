@@ -40,7 +40,6 @@ def KWIC(truePositivesMaster):
     """Creates readable xhtml output  """
     
     parser = XMLParser(encoding="utf-8")
-    
 
     root = TElement('root')
     html = TElement('html', parent=root)
@@ -77,12 +76,13 @@ def KWIC(truePositivesMaster):
         #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
         contents = parsedDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
-        entryTuples = [entryTuples for entryTuples in errors[doc]['FN']]
-        entryTuples.extend([entryTuples for entryTuples in errors[doc]['FP']])
-
-        print "entryTuples: ", entryTuples
+        entryTuples = [entryTuples for entryTuples in errors[doc]['FP']]
+        entryTuples.extend([entryTuples for entryTuples in errors[doc]['FN']])
+        for entry in entryTuples:
+            if type(entry) != tuple:
+                entryTuples.insert(entryTuples.index(entry),(entry,))
+                entryTuples.remove(entry)
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
-        
         for content in contents:
             if content.firstChild is not None:
                 wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
@@ -94,20 +94,24 @@ def KWIC(truePositivesMaster):
                     outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
                 else:
                     outputParagraph.append(wordDict['entry_' + str(i)])
-        for entry in entryTuples:
+        for entries in entryTuples:
+            pass
             #for entry in entries:
             #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
-            entryTuple = [subentry for subentry in entry if len(entry) > 1]
-            print "entryTuple", entryTuple
+            #if len(entries) > 1:
+            #    for subentry in entries:
+            #        print subentry
+            #        entryTuples.append((subentry,))
+            #    entryTuples.remove(entries)
+
+        for entry in entryTuples:
             for i in range(len(wordDict)):
-                #looking at each token
-                
-                if 'entry_' + str(i) == entry: #or 'entry_' + str(i) == entry in:
-                    tempEntry = 'entry_' + str(i) #so as to avoid this string / tuple concatenation error below
+                if ('entry_' + str(i),) == entry : #or 'entry_' + str(i) == entry in:
                     if entry in errors[doc]['FP']:
-                        outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="' + str(errors[doc]['FP'][(entry,)])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
                     elif entry in errors[doc]['FN']:
-                        outputParagraph[i] = '<font style="background-color:red"><strong><error gs="" eng="' + str(errors[doc]['FN'][(entry,)])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+            print doc, entry, errors[doc]['FP'][entry]
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
     output = "<contexts>" + "".join(output) + "</contexts>"
@@ -234,8 +238,7 @@ for doc in docs:
                         engDic[entries] = value
         for k, v in engDic.items():
             engDic[k] = tuple(v)
-
-            
+         
         ## Begin comparison of data structures
 
         # True Positives
@@ -268,11 +271,19 @@ for doc in docs:
         #False positives: 
         engDiffs = {entry:engDic[entry] for entry in engDic if entry not in gsDic}
 
+        engDiffsOneToOne = {}
+        for entry in engDiffs:
+            if len(entry) > 1:
+                for subentry in entry:
+                    engDiffsOneToOne[(subentry,)] = engDiffs[entry]
+            else:
+                engDiffsOneToOne[entry] = engDiffs[entry]
+
         errors[doc] = {}
         errors[doc]["FN"] = {}
         errors[doc]["FN"] = gsDiffs
         errors[doc]["FP"] = {}
-        errors[doc]["FP"] = engDiffs
+        errors[doc]["FP"] = engDiffsOneToOne
 
         # Increments false positive count
         # Checks whether entries that exist in the engine exist in the gold standard
@@ -337,17 +348,12 @@ for doc in docs:
         engDiffsEntries = engineDiffsEntries
         
         # Checking for scope match, value mismatch (Same entry number, different code value):
-        #print "\n\nScope Match - Value Mismatch MIMs:"
-        #print "_____________________________________________\n"
-
         scopeMatchValueMismatch = []
-        """
+
         print("~")
-        print(engineDiffsEntries)
+        print "engine diffs entries: ", engineDiffsEntries
         print("-----")
-        print(gsDic)
-        print("-------")
-        print(gsDiffsEntries)
+        print "gs diffs entries: ", gsDiffsEntries
         print("~")
         for i in range(len(engDiffsEntries)):
             for j in range(len(gsDic)):
@@ -356,7 +362,8 @@ for doc in docs:
                 # in other words, if the scopes (read: the tuple of entry numbers) are the same, then...
                     print engineDiffsEntries[i][1] + " was confused for the correct mim code " + gsDic[gsDic.keys()[j]]
                     scopeMatchValueMismatch.append(gsDic[j][0])
-        """
+        print "scope match value mismatch mims: ", scopeMatchValueMismatch
+                    
         # Get each gs diff entry (ede -- engine diff entry)
         for gde in gsDiffsEntries:
             # Get the key (a tuple) of each gold standard dic item
@@ -406,10 +413,10 @@ for doc in docs:
         #
         # Test cases: "in October" vs "October" for DATE, "on October 21 1993" and "October 21 1993" as ABSOLUTE_DATE
         # --> entry is in tuple but engine result tuple and gs tuple are different lengths
-        engDiffsEntries = {}
-        print "\n\nScope Mismatch - Value Match MIMs:"
-        print "_____________________________________________\n"
-        scopeMismatchValueMatch = []
+##        engDiffsEntries = {}
+##        print "\n\nScope Mismatch - Value Match MIMs:"
+##        print "_____________________________________________\n"
+##        scopeMismatchValueMatch = []
 
 
 ##        for i in range(len(gsWorkingData)):
@@ -453,12 +460,6 @@ print 'Recall (TP/TP+FN): ' + str(float(truePosCount)/float(truePosCount+falseNe
 # HTML Output
 #
 
-##out.write('<h3>Total correct: ' + str(len(truePositives)) + '</h3>')
-##    out.write('<h3>Total errors: ' + str(falsePosCount+falseNegCount) + ' </h3>')
-##    out.write('<h3>Total GS MIMs: ' + str(len(gsDic)) + '</h3>')
-##    out.write('<h3>Total Engine MIMs: ' + str(len(engDic)) + '</h3></td></tr></table>')
-
-            
 # Creating dom structure, adding proper headers and td's for each label of comparison
 
 root = TElement('root')
@@ -485,21 +486,15 @@ head.extend(css)
 head.extend(title)
 head.extend(jquery)
 
-
-
-
 #Body
 
 values = sorted([key for key in finalData.keys()])
 
 body = TElement('body', parent=html)
 
-
-
 h1 = TElement('h1', text="Deid Stats Results:", parent=body)
 
 timeGenerated = TElement('p', text="Generated at: " + str(datetime.datetime.now()).split('.')[0], parent=body)
-
 
 table = TElement('table', parent=body)
 table.attrib['class'] = "ellipsable"
@@ -511,12 +506,17 @@ for th in tableHeaders:
     th.attrib['class'] = "resizable"
     #So as to set this up for a nice resizing feature with jquery
 
-headerRow.extend(TElement('th', parent=headerRow))
-headerRow.extend(TElement('th', text="Engine:", parent=headerRow))
+blankTableHeader = TElement('th', parent=headerRow)
+blankTableHeader.attrib['class'] = "blank"
+headerRow.extend(blankTableHeader)
+engineHeader = TElement('th', text="Engine:", parent=headerRow)
+engineHeader.attrib['style'] = "background: #b01c38;"
+headerRow.extend(engineHeader)
 headerRow.extend(tableHeaders)
-
 goldBlankRow = TElement('tr', parent=table)
-goldBlankRow.extend(TElement('th', text="Golds:", parent=goldBlankRow))
+goldHeader = TElement('th', text="Golds:", parent=goldBlankRow)
+goldHeader.attrib['style'] = "background: #b01c38;"
+goldBlankRow.extend(goldHeader)
 
 tdList = []
 for column in values:
@@ -526,25 +526,26 @@ for column in values:
     blankData.attrib['style'] = "border:0px"
     for row in values:
         #getting the td data for each row in pulling from the confusionMatrix dic
-        comparisonData = [TElement('td', text=str(finalData[column][row])) for row in values]
+        comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
         for tdElement in comparisonData:
-            if tdElement.text != '0':
-                tdElement.attrib['style'] = "background: #ed6e00" # #00cd00 -- a nice green for true positives
+            #tdElement.attrib['column'] = tdElement. find parent's sibling's child element that is nth element (where n = index / nth-ness of tdElement)
+            tdElement.attrib['row'] = column[0]
+            if tdElement.attrib['column'] == tdElement.attrib['row']:
+                tdElement.attrib['style'] = "background: #00cd00"
+            elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
+                tdElement.attrib['style'] = "background: #ed6e00"
             else:
                 tdElement.attrib['style'] = "background: white; color: #0962ac;"
         
             dataRow.extend(tdElement)
+    #^ if sibling th's name (inner text) is the same as the th of a sibling to tdElement's parent's child ... ... ..
+            
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
 
 
 emptySpacing = TElement('p', parent=body)
-
-falsePositivesData = '[{title:"Absolute Date", value:20, color: "#2C3E50"}, {title:"Date", value:80, color: "#FC4349" }, {title: "Age", value: 70, color: "#6DBCDB"}, {title: "Medical Record Number", value: 50, color: "#F7E248"}, {title: "Hospital", value: 40, color: "#D7DADB"}]'
-
-falsePosScriptBody = '$(function(){$("#doughnutChart").drawDoughnutChart(' + falsePositivesData + ');});'
-falsePosScript = TElement('script', text=falsePosScriptBody, parent=body)
 
 stats = TElement('table', parent=body)
 stats.attrib['style'] = "border:0px"
@@ -553,26 +554,11 @@ baseStats = TElement('tr', parent=stats)
 
 truePos = TElement('th', text='True Positives: ' + str(truePosCount), parent=baseStats)
 falseNegs = TElement('th', text='False Negatives: ' + str(falseNegCount), parent=baseStats)
+falsePos = TElement('th', text="False Positives: " + str(falsePosCount), parent=baseStats)
 precision = TElement('th', text='Precision (TPs/TPs+FPs): ' + str(float(truePosCount)/float(truePosCount+falsePosCount)), parent=baseStats)
 recall = TElement('th', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
 
-
-falsePos = TElement('th', parent=baseStats)
-
-overlayForStats = TElement('div', parent=body)
-overlayForStats.attrib['id'] = "overlay"
-
-openFalsePos = TElement('a', text='False Positives: ' + str(falsePosCount), parent=falsePos)
-openFalsePos.attrib['onclick'] = "document.getElementById('overlay').style.display='block';"
-openFalsePos.attrib['href'] = "javascript:void(0)"
-
-falsePosSVG = TElement('div', parent=overlayForStats)
-falsePosSVG.attrib['id'] = "doughnutChart"
-falsePosSVG.attrib['class'] = "chart"
-
-
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
-
 
 # KWIC examination text to go here in html
 
