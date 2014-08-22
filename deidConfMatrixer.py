@@ -108,9 +108,12 @@ def KWIC(truePositivesMaster):
             for i in range(len(wordDict)):
                 if ('entry_' + str(i),) == entry : #or 'entry_' + str(i) == entry in:
                     if entry in errors[doc]['FP']:
-                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        if entry not in gsDic[doc]:
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="ENGINE_ONLY_ENTRY" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        else:
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
                     elif entry in errors[doc]['FN']:
-                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
             print doc, entry, errors[doc]['FP'][entry]
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
@@ -165,11 +168,13 @@ falsePosCount = 0
 confusionMatrix = {}
 errorDic = {}
 errors = {}
-
+truePositives = {}
+gsDic = {}
+engDic = {}
 
 matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
 (u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
-(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',)]
+(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)]
 
 for doc in docs:
     if not doc.endswith('.out.xml'):
@@ -178,7 +183,6 @@ for doc in docs:
         print "\n\n_______________________________________\n"
         print "Now parsing document %s out of %s..." % (docCount, len(docs)/2)
         print "_______________________________________\n\n"
-        
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngDoc = parse(findPair(path + '\\' + doc))
         
@@ -202,7 +206,7 @@ for doc in docs:
         # Establishing the gold standard data structures
         
         #  assmpt: the gold standard set is perfect & 1:1 
-        gsDic = {}
+        gsDic[doc] = {}
         entries = parsedGSDoc.getElementsByTagName('entry')
         for entry in entries:
             bindings = []
@@ -210,20 +214,21 @@ for doc in docs:
                 if child.localName == 'binding':
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
                     entries = tuple(str(binding) for binding in bindings if len(binding)>0)
-                    #print entries 
+                    print entries 
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    #print value
-                    if entries in gsDic:
-                        gsDic[entries].append(str(value).strip('[]'))
-                    else:
-                        gsDic[entries] = value
-        for k, v in gsDic.items():
-            gsDic[k] = tuple(v)
+                    print value
+                    gsDic[doc][entries] = value
+        for k, v in gsDic[doc].items():
+            gsDic[doc][k] = tuple(v)
+
+        print "gsDic!! : ", gsDic 
                         
         # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
+
+        # --> Create alert that funnels gs documents having overlapping MIMs and output at end of script
         
         ## Establishing the engine data structures
-        engDic = {}
+        engDic[doc] = {}
         entries = parsedEngDoc.getElementsByTagName('entry')
         for entry in entries:
             bindings = []
@@ -232,44 +237,44 @@ for doc in docs:
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
                     entries = tuple(str(binding) for binding in bindings if len(binding)>0)
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    if entries in engDic:
-                        engDic[entries].append("".join(value))
+                    if entries in engDic[doc]:
+                        engDic[doc][entries].append("".join(value))
                     else:
-                        engDic[entries] = value
-        for k, v in engDic.items():
-            engDic[k] = tuple(v)
+                        engDic[doc][entries] = value
+        for k, v in engDic[doc].items():
+            engDic[doc][k] = tuple(v)
          
         ## Begin comparison of data structures
 
         # True Positives
-        truePositives = {entry:tuple(gsDic[entry]) for entry in gsDic if entry in engDic and gsDic[entry] == engDic[entry]}
-        # Add multi-code entries as well:
-        for entry in gsDic.keys():
-            if entry in gsDic.keys() and entry in engDic.keys() and entry not in truePositives:
-                truePositives[entry] = tuple(code for code in gsDic[entry])
+        truePositives[doc] = {entry:tuple(gsDic[doc][entry]) for entry in gsDic[doc] if (entry in engDic[doc] and gsDic[doc][entry] == engDic[doc][entry])}
+        # Handle multi-code entries as well, for instance gs: (entry_7,): (u'AGE'), eng: (entry_7,): (u'AGE', u'AGE') -kind of overlapping:
+        for entry in gsDic[doc].keys():
+            if entry in gsDic[doc].keys() and entry in engDic[doc].keys() and entry not in truePositives[doc]:
+                truePositives[doc][entry] = tuple(code for code in gsDic[doc][entry])
             
         # Increments true positive counters in the confusion matrix
-        for entry in gsDic.keys():
-            if entry in truePositives and truePositives[entry] == gsDic[entry]:
-                if truePositives[entry] in confusionMatrix[doc] and truePositives[entry] in confusionMatrix[doc][truePositives[entry]]:
+        for entry in gsDic[doc].keys():
+            if entry in truePositives[doc] and truePositives[doc][entry] == tuple(gsDic[doc][entry]):
+                if truePositives[doc][entry] in confusionMatrix[doc] and truePositives[doc][entry] in confusionMatrix[doc][truePositives[doc][entry]]:
                     #if entry in engDic and engDic[entry] == gsDic[entry] # If the value exists, increment it
-                   confusionMatrix[doc][truePositives[entry]][truePositives[entry]] += 1
+                   confusionMatrix[doc][truePositives[doc][entry]][truePositives[doc][entry]] += 1
                 # If the value doesn't exist, add another row/column for it
                 else:
-                    confusionMatrix[doc][truePositives[entry]] = {}
+                    confusionMatrix[doc][truePositives[doc][entry]] = {}
                     for value2 in matrixValues:
-                        confusionMatrix[doc][truePositives[entry]][value2] = 0
-                    confusionMatrix[doc][truePositives[entry]][truePositives[entry]] = 1
-        print "\n\nTrue Positives: (x%s found!)\n" % len(truePositives)
-        truePosCount += len(truePositives)
-        print truePositives
+                        confusionMatrix[doc][truePositives[doc][entry]][value2] = 0
+                    confusionMatrix[doc][truePositives[doc][entry]][truePositives[doc][entry]] = 1
+        print "\n\nTrue Positives: (x%s found!)\n" % len(truePositives[doc])
+        truePosCount += len(truePositives[doc])
+        print truePositives[doc]
         
         # Checking for false positives, false negatives, and mismatches...
 
         #False negatives:
-        gsDiffs = {entry:gsDic[entry] for entry in gsDic if entry not in engDic}
+        gsDiffs = {entry:gsDic[doc][entry] for entry in gsDic[doc] if entry not in engDic[doc]}
         #False positives: 
-        engDiffs = {entry:engDic[entry] for entry in engDic if entry not in gsDic}
+        engDiffs = {entry:engDic[doc][entry] for entry in engDic[doc] if entry not in gsDic[doc]}
 
         engDiffsOneToOne = {}
         for entry in engDiffs:
@@ -279,9 +284,17 @@ for doc in docs:
             else:
                 engDiffsOneToOne[entry] = engDiffs[entry]
 
+        gsDiffsOneToOne = {}
+        for entry in gsDiffs:
+            if len(entry) > 1:
+                for subentry in entry:
+                    gsDiffsOneToOne[(subentry,)] = gsDiffs[entry]
+            else:
+                gsDiffsOneToOne[entry] = gsDiffs[entry]
+
         errors[doc] = {}
         errors[doc]["FN"] = {}
-        errors[doc]["FN"] = gsDiffs
+        errors[doc]["FN"] = gsDiffsOneToOne
         errors[doc]["FP"] = {}
         errors[doc]["FP"] = engDiffsOneToOne
 
@@ -289,42 +302,44 @@ for doc in docs:
         # Checks whether entries that exist in the engine exist in the gold standard
         # If not, it's a false positive
         # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
-        for entry in engDic:
+        for entry in engDic[doc]:
             # If value is in engine and not gs, increment
-            if entry not in gsDic:
+            if entry not in gsDic[doc]:
                 if "ENGINE_ONLY_ENTRY" in errorDic[doc]:
                     print "x1 engine only entry in confMatrix, so now incrementing"
-                    errorDic["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+                    errorDic["ENGINE_ONLY_ENTRY"][engDic[doc][entry]] += 1
                 else:
                     #no engine only entry found for this dic in confmatrix, making a new dic
                     errorDic["ENGINE_ONLY_ENTRY"] = {}
                     for value in matrixValues:
                         #initialize code from matrixValues to zero"
                         errorDic["ENGINE_ONLY_ENTRY"][value] = 0
-                    errorDic["ENGINE_ONLY_ENTRY"][engDic[entry]] += 1
+                    errorDic["ENGINE_ONLY_ENTRY"][engDic[doc][entry]] += 1
             # Non-matching codes handling
             else:
-                #if the entry numbers exist in both but the engineDic has a multi-code entry...
-                if len(engDic[entry]) > 1:
-                    for code in engDic[entry]:
-                        if code not in gsDic[entry]:
-                            confusionMatrix[doc][truePositives[entry]][(code,)] +=1
+                #if the entry numbers exist in both but the engineDic has a multi-code entry (meaning, overlapping MIMs)
+                if len(engDic[doc][entry]) > 1:
+                    for code in engDic[doc][entry]:
+                        print "code that is in engDic[doc][entry]: ", code
+                        if code not in gsDic[doc][entry]:
+                            print "code that is not in gsDic[doc][entry]: ", code
+                            confusionMatrix[doc][gsDic[doc][entry]][(code,)] += 1
                 # Otherwise, entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
-                elif truePositives[entry] != engDic[entry]:
-                    confusionMatrix[doc][truePositives[entry]][engDic[entry]] += 1
+                elif gsDic[doc][entry] != engDic[doc][entry]:
+                    confusionMatrix[doc][gsDic[doc][entry]][engDic[doc][entry]] += 1
         
 ##        # Increments false negative count
 ##        # Checks whether entries that exist in the gold standard exist in the engine
 ##        # If not, it's a false negative
-##        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
-        for entry in gsDic:
-            if entry not in engDic:
-                if "GS_ONLY_ENTRY" in errorDic[gsDic[entry]]:
-                    errorDic[doc][gsDic[entry]]["GS_ONLY_ENTRY"] += 1
-                    print "found a GS ONLY ENTRY!!"
+##        # NOTE: Doesn't includeerror checking. Base it off the true positives' error checking
+        for entry in gsDic[doc]:
+            if entry not in engDic[doc]:
+                if entry in errorDic[doc]:
+                    errorDic[doc][gsDic[doc][entry]] += 1
+                    print "found a false negative!!"
                 else:
-                    errorDic[gsDic[entry]]["GS_ONLY_ENTRY"] = 1
-                    print "initialized a GS ONLY ENTRY"
+                    errorDic[doc][gsDic[doc][entry]] = 1
+                    print "initialized a false negative entry"
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
@@ -360,14 +375,14 @@ for doc in docs:
             # Comparing against true positives
                 if engDiffsEntries[i] == gsDic.keys()[j][0]:
                 # in other words, if the scopes (read: the tuple of entry numbers) are the same, then...
-                    print engineDiffsEntries[i][1] + " was confused for the correct mim code " + gsDic[gsDic.keys()[j]]
+                    print engineDiffsEntries[i][1] + " was confused for the correct mim code " + gsDic[doc][gsDic.keys()[j]]
                     scopeMatchValueMismatch.append(gsDic[j][0])
         print "scope match value mismatch mims: ", scopeMatchValueMismatch
                     
         # Get each gs diff entry (ede -- engine diff entry)
         for gde in gsDiffsEntries:
             # Get the key (a tuple) of each gold standard dic item
-            for key in gsDic.keys():
+            for key in gsDic[doc].keys():
                 # Convert each to a string for easy comparison
                 strGDE = str(gde)
                 strKey = str(key)
