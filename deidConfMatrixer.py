@@ -492,10 +492,7 @@ css.attrib['type'] = "text/css"
 css.attrib['rel'] = "stylesheet"
 
 jquery = TElement('script', text="//", parent=head)
-jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
-
-doughnutChart = TElement('script', text="//", parent=head)
-doughnutChart.attrib['src'] = "doughnut.js"
+jquery.attrib['src'] = "http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"
 
 head.extend(css)
 head.extend(title)
@@ -524,6 +521,7 @@ for th in tableHeaders:
 blankTableHeader = TElement('th', parent=headerRow)
 blankTableHeader.attrib['class'] = "blank"
 headerRow.extend(blankTableHeader)
+
 engineHeader = TElement('th', text="Engine:", parent=headerRow)
 engineHeader.attrib['style'] = "background: #b01c38;"
 headerRow.extend(engineHeader)
@@ -553,7 +551,6 @@ for column in values:
                 tdElement.attrib['style'] = "background: white; color: #0962ac;"
         
             dataRow.extend(tdElement)
-    #^ if sibling th's name (inner text) is the same as the th of a sibling to tdElement's parent's child ... ... ..
             
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
@@ -574,6 +571,34 @@ precision = TElement('th', text='Precision (TPs/TPs+FPs): ' + str(float(truePosC
 recall = TElement('th', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
+
+tooltips = TElement('script', text="""
+
+
+$(document).ready(function(){
+    var text = "".concat($(this).attr('row'), " x ", $(this).attr('column'));
+    $('td').attr('title', text);
+    $('td').hover(function(){
+        var title = $(this).attr('title');
+        $(this)
+        .data('tipText', title)
+        .removeAttr('title');
+        p = document.createElement('p');
+        $('p').addClass('tooltip')
+        .text(text)
+        .appendTo('body')
+        .fadeIn('fast');
+    }, function() {
+        $(this).attr('title', $(this).data('tipText'));
+    }).mousemove(function(e) {
+        var mousex = e.pageX + 20;
+        var mousey = e.pageY + 10;
+        $('.tooltip')
+        .css({ top: mousey, left: mousex })
+    });
+});
+""", parent=body)
+tooltips.attrib['type'] = "text/javascript"
 
 # KWIC examination text to go here in html
 
