@@ -131,6 +131,7 @@ def KWIC(truePositivesMaster):
     allContextsPerDoc = finalOutput.findall('context')
         
     allContextsTable = TElement('table', parent=body)
+    allContextsTable.attrib['id'] = "KWIC"
 
     for context in allContextsPerDoc:
         allContextsTable.append(TElement('h3', text=context.get('doc')))
@@ -514,6 +515,9 @@ table.attrib['class'] = "ellipsable"
 headerRow = TElement('tr', parent=table)
 
 tableHeaders = [ TElement('th', text=column[0]) for column in values]
+tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#b01c38;'}))
+tableHeaders.append(TElement('th', text="MicroRec", attrib={'style':'background:#b01c38'}))
+microPreTh = TElement('th', text='MicroPrec', attrib={'style':'background:#b01c38;'})
 for th in tableHeaders:
     th.attrib['class'] = "resizable"
     #So as to set this up for a nice resizing feature with jquery
@@ -531,30 +535,68 @@ goldHeader = TElement('th', text="Golds:", parent=goldBlankRow)
 goldHeader.attrib['style'] = "background: #b01c38;"
 goldBlankRow.extend(goldHeader)
 
-tdList = []
+
+
 for column in values:
     dataRow = TElement('tr', parent=table)
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
     for row in values:
-        #getting the td data for each row in pulling from the confusionMatrix dic
+        counter = 0
+        tp = 0
+        fp = 0
+        # getting the td data for each row in pulling from the confusionMatrix dic
         comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
-        for tdElement in comparisonData:
-            #tdElement.attrib['column'] = tdElement. find parent's sibling's child element that is nth element (where n = index / nth-ness of tdElement)
+        # appending engine sums
+        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#b01c38;'}))
+        #adding either green, orange, white, or blue as background styling to the data
+        for tdElement in comparisonData[:-1]:
             tdElement.attrib['row'] = column[0]
             if tdElement.attrib['column'] == tdElement.attrib['row']:
+                tp = tdElement.text
                 tdElement.attrib['style'] = "background: #00cd00"
             elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
+                fp += tdElement.text
                 tdElement.attrib['style'] = "background: #ed6e00"
             else:
                 tdElement.attrib['style'] = "background: white; color: #0962ac;"
-        
             dataRow.extend(tdElement)
-            
+        #microrecall
+        comparisonData.append(TElement('td', text="-", attrib={'style':'background:white;'})) # tp/tp+fn
+        #microprecision
+        print "tp: ", tp, " and fp: ", fp
+        counter +=1
+        print "count: ", counter
+        if tp != 0:
+            comparisonData.append(TElement('td', text=str(float(int(tp))/float(int(tp)) + float(int(fp))), attrib={'style':'background:white;'})) #tp/tp+fp
+        elif tp == int(0):
+            print "a tp found to be equal to zero!"
+            comparisonData.append(TElement('td', text="N/A"))
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
+
+# Generating nested list of values to make column tabulations easier:
+listMatrix = []
+for column in values:
+        listMatrix.append([finalData[column][row] for row in values])
+
+#Generating tds for tabulations of columns        
+engSumsTr = TElement('tr', parent=table)
+engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#b01c38;'})
+engSumsBlankTd = TElement('td', parent=engSumsTr)
+for i in range(len(listMatrix)):
+    td = 0
+    for j in range(len(listMatrix[i])):
+        td += listMatrix[j][i]
+    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#b01c38;'})
+
+
+#Microprecision
+#for tdElement in comparisonData:   
+#str(float(truePosCount)/float(truePosCount+falsePosCount))
+
 
 
 emptySpacing = TElement('p', parent=body)
@@ -572,33 +614,33 @@ recall = TElement('th', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
 
-tooltips = TElement('script', text="""
-
-
-$(document).ready(function(){
-    var text = "".concat($(this).attr('row'), " x ", $(this).attr('column'));
-    $('td').attr('title', text);
-    $('td').hover(function(){
-        var title = $(this).attr('title');
-        $(this)
-        .data('tipText', title)
-        .removeAttr('title');
-        p = document.createElement('p');
-        $('p').addClass('tooltip')
-        .text(text)
-        .appendTo('body')
-        .fadeIn('fast');
-    }, function() {
-        $(this).attr('title', $(this).data('tipText'));
-    }).mousemove(function(e) {
-        var mousex = e.pageX + 20;
-        var mousey = e.pageY + 10;
-        $('.tooltip')
-        .css({ top: mousey, left: mousex })
-    });
-});
-""", parent=body)
-tooltips.attrib['type'] = "text/javascript"
+##tooltips = TElement('script', text="""
+##
+##
+##$(document).ready(function(){
+##    var text = "".concat($(this).attr('row'), " x ", $(this).attr('column'));
+##    $('td').attr('title', text);
+##    $('td').hover(function(){
+##        var title = $(this).attr('title');
+##        $(this)
+##        .data('tipText', title)
+##        .removeAttr('title');
+##        p = document.createElement('p');
+##        $('p').addClass('tooltip')
+##        .text(text)
+##        .appendTo('body')
+##        .fadeIn('fast');
+##    }, function() {
+##        $(this).attr('title', $(this).data('tipText'));
+##    }).mousemove(function(e) {
+##        var mousex = e.pageX + 20;
+##        var mousey = e.pageY + 10;
+##        $('.tooltip')
+##        .css({ top: mousey, left: mousex })
+##    });
+##});
+##""", parent=body)
+#tooltips.attrib['type'] = "text/javascript"
 
 # KWIC examination text to go here in html
 
