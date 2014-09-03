@@ -37,7 +37,7 @@ def findPair(fname):
 
 
 def KWIC(truePositivesMaster):
-    """Creates readable xhtml output  """
+    """Creates readable xhtml output contexts """
     
     parser = XMLParser(encoding="utf-8")
 
@@ -76,10 +76,15 @@ def KWIC(truePositivesMaster):
         #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
         contents = parsedDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
-        entryTuples = [entryTuples for entryTuples in errors[doc]['FP']]
-        entryTuples.extend([entryTuples for entryTuples in errors[doc]['FN']])
+        entryTuples = [FPtuples for FPtuples in errors[doc]['FP']]
+        print doc + ": "
+        print "entryTuples (before) : ", entryTuples
+        entryTuples.extend([FNtuples for FNtuples in errors[doc]['FN']])
+        print "entryTuples (after) : ", entryTuples
         for entry in entryTuples:
             if type(entry) != tuple:
+                print type(entry)
+                print "the entry type wasn't a tuple, and so attempting to reinsert " + entry + " at the same index as a tuple"
                 entryTuples.insert(entryTuples.index(entry),(entry,))
                 entryTuples.remove(entry)
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
@@ -88,14 +93,14 @@ def KWIC(truePositivesMaster):
                 wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
         for i in range(len(wordDict)):
-            #getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document -- removed these 
+            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document) 
             if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
                 if '&' in wordDict['entry_' + str(i)]:
                     outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
                 else:
                     outputParagraph.append(wordDict['entry_' + str(i)])
-        for entries in entryTuples:
-            pass
+        #for entries in entryTuples:
+            #pass
             #for entry in entries:
             #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
             #if len(entries) > 1:
@@ -113,8 +118,7 @@ def KWIC(truePositivesMaster):
                         else:
                             outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
                     elif entry in errors[doc]['FN']:
-                        outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-            print doc, entry, errors[doc]['FP'][entry]
+                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="GS_ONLY_ENTRY" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
     output = "<contexts>" + "".join(output) + "</contexts>"
@@ -161,6 +165,7 @@ class TElement(ET._Element):
 
 ## Begin processing...
 docCount=0
+# Filter only xml files as the file type to be tested
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
 allData = {}
 truePosCount = 0
@@ -173,6 +178,7 @@ truePositives = {}
 gsDic = {}
 engDic = {}
 
+# Labels to be tested -- implement later as a dictionary later so as to accommodate Certainty, Temporality, Subject, Acuity, etc.
 matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
 (u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
 (u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)]
@@ -453,7 +459,7 @@ for doc in docs:
             for value2 in matrixValues:
                     finalData[value][value2] = 0
                     
-        #summing totals for each gsKey
+        # summing totals for each gsKey
         for doc in confusionMatrix:
             for key in confusionMatrix[doc]:
                 for secondKey in confusionMatrix[doc][key]:
@@ -514,20 +520,20 @@ table.attrib['class'] = "ellipsable"
 
 headerRow = TElement('tr', parent=table)
 
-tableHeaders = [ TElement('th', text=column[0]) for column in values]
-tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#b01c38;'}))
-tableHeaders.append(TElement('th', text="MicroRec", attrib={'style':'background:#b01c38'}))
-microPreTh = TElement('th', text='MicroPrec', attrib={'style':'background:#b01c38;'})
-for th in tableHeaders:
-    th.attrib['class'] = "resizable"
-    #So as to set this up for a nice resizing feature with jquery
-
 blankTableHeader = TElement('th', parent=headerRow)
 blankTableHeader.attrib['class'] = "blank"
 headerRow.extend(blankTableHeader)
 
+#adding all test labels and stats labels as headers for the matrix table
 engineHeader = TElement('th', text="Engine:", parent=headerRow)
 engineHeader.attrib['style'] = "background: #b01c38;"
+tableHeaders = [ TElement('th', text=column[0]) for column in values]
+tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#b01c38;'}))
+tableHeaders.append(TElement('th', text="Fscore", attrib={'style':'background:#b01c38;'}))
+tableHeaders.append(TElement('th', text="mRecall", attrib={'style':'background:#b01c38'}))
+tableHeaders.append(TElement('th', text='mPrecision', attrib={'style':'background:#b01c38;'}))
+for th in tableHeaders:
+    th.attrib['class'] = "resizable"
 headerRow.extend(engineHeader)
 headerRow.extend(tableHeaders)
 goldBlankRow = TElement('tr', parent=table)
@@ -535,44 +541,49 @@ goldHeader = TElement('th', text="Golds:", parent=goldBlankRow)
 goldHeader.attrib['style'] = "background: #b01c38;"
 goldBlankRow.extend(goldHeader)
 
-
-
+#for each test label:
 for column in values:
+    counter = 0
+    tp = 0
+    fp = 0
+    fn = 0
     dataRow = TElement('tr', parent=table)
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
     for row in values:
-        counter = 0
-        tp = 0
-        fp = 0
         # getting the td data for each row in pulling from the confusionMatrix dic
         comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
         # appending engine sums
-        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#b01c38;'}))
+        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#b01c38; color: #fff'}))
         #adding either green, orange, white, or blue as background styling to the data
         for tdElement in comparisonData[:-1]:
             tdElement.attrib['row'] = column[0]
             if tdElement.attrib['column'] == tdElement.attrib['row']:
-                tp = tdElement.text
-                tdElement.attrib['style'] = "background: #00cd00"
+                tp = int(tdElement.text)
+                tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
             elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
-                fp += tdElement.text
-                tdElement.attrib['style'] = "background: #ed6e00"
+                fp += int(tdElement.text)
+                print "current fp: " + str(fp)
+                tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
             else:
-                tdElement.attrib['style'] = "background: white; color: #0962ac;"
+                tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
             dataRow.extend(tdElement)
-        #microrecall
-        comparisonData.append(TElement('td', text="-", attrib={'style':'background:white;'})) # tp/tp+fn
-        #microprecision
-        print "tp: ", tp, " and fp: ", fp
-        counter +=1
-        print "count: ", counter
-        if tp != 0:
-            comparisonData.append(TElement('td', text=str(float(int(tp))/float(int(tp)) + float(int(fp))), attrib={'style':'background:white;'})) #tp/tp+fp
-        elif tp == int(0):
-            print "a tp found to be equal to zero!"
+        print "out of loop, tabulated fp: " + str(fp)
+        # f-score
+        comparisonData.append(TElement('td', text="---", attrib={'style':'background:white; color: #404040;'}))
+        # microrecall
+        if tp == 0:
             comparisonData.append(TElement('td', text="N/A"))
+        elif tp != 0:
+            comparisonData.append(TElement('td', text=str(float(int(tp))/(int(tp) + int(fn))), attrib={'style':'background:white; color: #404040;'})) # tp/tp+fn
+        # microprecision
+        if tp == 0:
+            comparisonData.append(TElement('td', text="N/A"))
+        elif tp != 0:
+            print "dividing " + str(float(int(tp))) + " by " + str(int(tp) + int(fp)) + " where there are %s fp's" % fp
+            comparisonData.append(TElement('td', text=str(float(int(tp))/(int(tp) + int(fp))), attrib={'style':'background:white; color: #404040;'})) #tp/tp+fp
+            break
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
@@ -590,7 +601,7 @@ for i in range(len(listMatrix)):
     td = 0
     for j in range(len(listMatrix[i])):
         td += listMatrix[j][i]
-    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#b01c38;'})
+    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#b01c38; color: #fff'})
 
 
 #Microprecision
@@ -604,6 +615,7 @@ emptySpacing = TElement('p', parent=body)
 stats = TElement('table', parent=body)
 stats.attrib['style'] = "border:0px"
 
+#Stats at a glance
 baseStats = TElement('tr', parent=stats)
 
 truePos = TElement('th', text='True Positives: ' + str(truePosCount), parent=baseStats)
@@ -646,6 +658,7 @@ authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for question
 
 # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
 
+#write matrix table to file
 with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
     for i in range(len(root)):
         outputFile.write(ET.tostring(root[i]))
