@@ -167,21 +167,34 @@ class TElement(ET._Element):
 docCount=0
 # Filter only xml files as the file type to be tested
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
-allData = {}
-truePosCount = 0
-falseNegCount = 0
-falsePosCount = 0
-confusionMatrix = {}
-errorDic = {}
-errors = {}
-truePositives = {}
-gsDic = {}
-engDic = {}
 
 # Labels to be tested -- implement later as a dictionary later so as to accommodate Certainty, Temporality, Subject, Acuity, etc.
 matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
 (u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
 (u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)]
+
+allData = {}
+truePosCount = 0
+falseNegCount = 0
+falsePosCount = 0
+confusionMatrix = {}
+
+#for engine only or gs only MIMs
+fnDic = {}
+fpDic = {}
+        # will be used in referencing FN and FP (for MIMs occuring only in the engine) counts in the matrix table rendering below
+fnDic = {}
+for value in matrixValues:
+    fnDic[value] = 0
+
+fpDic = {}
+for value in matrixValues:
+    fpDic[value] = 0
+
+errors = {}
+truePositives = {}
+gsDic = {}
+engDic = {}
 
 for doc in docs:
     if not doc.endswith('.out.xml'):
@@ -195,12 +208,6 @@ for doc in docs:
         
         outputList = []
         documentText = {}
-        
-        errorDic[doc] = {}
-        for value in matrixValues:
-            errorDic[doc][value] = {}
-            for value2 in matrixValues:
-                errorDic[doc][value][value2] = 0
                 
         # Creates rows and columns for the matrix labeled with codes(matrixValues)
         # Instantiates each false/true positive count to 0
@@ -221,14 +228,12 @@ for doc in docs:
                 if child.localName == 'binding':
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
                     entries = tuple(str(binding) for binding in bindings if len(binding)>0)
-                    print entries 
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    print value
                     gsDic[doc][entries] = value
         for k, v in gsDic[doc].items():
             gsDic[doc][k] = tuple(v)
 
-        print "gsDic!! : ", gsDic 
+        #print "gsDic : ", gsDic 
                         
         # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
 
@@ -272,9 +277,9 @@ for doc in docs:
                     for value2 in matrixValues:
                         confusionMatrix[doc][truePositives[doc][entry]][value2] = 0
                     confusionMatrix[doc][truePositives[doc][entry]][truePositives[doc][entry]] = 1
-        print "\n\nTrue Positives: (x%s found!)\n" % len(truePositives[doc])
+        #print "\n\nTrue Positives: (x%s found!)\n" % len(truePositives[doc])
         truePosCount += len(truePositives[doc])
-        print truePositives[doc]
+        #print truePositives[doc]
         
         # Checking for false positives, false negatives, and mismatches...
 
@@ -299,6 +304,8 @@ for doc in docs:
             else:
                 gsDiffsOneToOne[entry] = gsDiffs[entry]
 
+        # errors has the structure {doc:{"FN":{entry:code, ...}, "FP":{entry:code, ...} }
+        # -> being used by KWIC to provide error highlighting in contexts -- created the above 1:1 dics to facilitate that process for multi-token Mims
         errors[doc] = {}
         errors[doc]["FN"] = {}
         errors[doc]["FN"] = gsDiffsOneToOne
@@ -312,16 +319,21 @@ for doc in docs:
         for entry in engDic[doc]:
             # If value is in engine and not gs, increment
             if entry not in gsDic[doc]:
-                if "ENGINE_ONLY_ENTRY" in errorDic[doc]:
-                    print "x1 engine only entry in confMatrix, so now incrementing"
-                    errorDic["ENGINE_ONLY_ENTRY"][engDic[doc][entry]] += 1
-                else:
-                    #no engine only entry found for this dic in confmatrix, making a new dic
-                    errorDic["ENGINE_ONLY_ENTRY"] = {}
-                    for value in matrixValues:
-                        #initialize code from matrixValues to zero"
-                        errorDic["ENGINE_ONLY_ENTRY"][value] = 0
-                    errorDic["ENGINE_ONLY_ENTRY"][engDic[doc][entry]] += 1
+                if len(engDic[doc][entry]) > 1:
+                    # check KeyError: (u'FEMALE_NAME', u'DATE') for doc 47/313 (probably 'B~ClinicalDocument_2531473614.xml')
+                    for code in engDic[doc][entry]:
+                        fpDic[(code,)] += 1
+                else: fpDic[engDic[doc][entry]] += 1
+##                if "ENGINE_ONLY_FP" in errorDic[doc]:
+##                    print "x1 engine only entry in confMatrix, so now incrementing"
+##                    errorDic[doc]["ENGINE_ONLY_FP"][engDic[doc][entry]] += 1
+##                else:
+##                    #no engine only entry found for this dic in confmatrix, making a new dic
+##                    errorDic[doc]["ENGINE_ONLY_FP"] = {}
+##                    for value in matrixValues:
+##                        #initialize code from matrixValues to zero"
+##                        errorDic[doc]["ENGINE_ONLY_FP"][value] = 0
+##                    errorDic[doc]["ENGINE_ONLY_FP"][engDic[doc][entry]] += 1
             # Non-matching codes handling
             else:
                 #if the entry numbers exist in both but the engineDic has a multi-code entry (meaning, overlapping MIMs)
@@ -335,18 +347,14 @@ for doc in docs:
                 elif gsDic[doc][entry] != engDic[doc][entry]:
                     confusionMatrix[doc][gsDic[doc][entry]][engDic[doc][entry]] += 1
         
-##        # Increments false negative count
-##        # Checks whether entries that exist in the gold standard exist in the engine
-##        # If not, it's a false negative
-##        # NOTE: Doesn't includeerror checking. Base it off the true positives' error checking
+        # Increments false negative count
+        # Checks whether entries that exist in the gold standard exist in the engine
+        # If not, it's a false negative
+        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
         for entry in gsDic[doc]:
             if entry not in engDic[doc]:
-                if entry in errorDic[doc]:
-                    errorDic[doc][gsDic[doc][entry]] += 1
-                    print "found a false negative!!"
-                else:
-                    errorDic[doc][gsDic[doc][entry]] = 1
-                    print "initialized a false negative entry"
+                fnDic[gsDic[doc][entry]] += 1
+                print "initialized a false negative entry"
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
@@ -355,11 +363,11 @@ for doc in docs:
         print "_____________________________________________\n"
         print "In gold standard version but not in engine version (false negatives): (x%s found)" % len(gsDiffs)
         falseNegCount += len(gsDiffs)
-        print gsDiffs
+        #print gsDiffs
         print ""
-        print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engDiffs)
+        #print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engDiffs)
         falsePosCount += len(engDiffs)
-        print engDiffs
+        #print engDiffs
         print "\n\n"
         ### engineDiffs will contain false positives, scopeMismatchValueMatches, and ScopeMatchValueMismatch
         
@@ -370,32 +378,31 @@ for doc in docs:
         engDiffsEntries = engineDiffsEntries
         
         # Checking for scope match, value mismatch (Same entry number, different code value):
-        scopeMatchValueMismatch = []
+##        scopeMatchValueMismatch = []
 
-        print("~")
-        print "engine diffs entries: ", engineDiffsEntries
-        print("-----")
-        print "gs diffs entries: ", gsDiffsEntries
-        print("~")
-        for i in range(len(engDiffsEntries)):
-            for j in range(len(gsDic)):
-            # Comparing against true positives
-                if engDiffsEntries[i] == gsDic.keys()[j][0]:
-                # in other words, if the scopes (read: the tuple of entry numbers) are the same, then...
-                    print engineDiffsEntries[i][1] + " was confused for the correct mim code " + gsDic[doc][gsDic.keys()[j]]
-                    scopeMatchValueMismatch.append(gsDic[j][0])
-        print "scope match value mismatch mims: ", scopeMatchValueMismatch
+##        print("~")
+##        print "engine diffs entries: ", engineDiffsEntries
+##        print("-----")
+##        print "gs diffs entries: ", gsDiffsEntries
+##        print("~")
+##        for i in range(len(engDiffsEntries)):
+##            for j in range(len(gsDic[doc])):
+##            # Comparing against true positives
+##                if engDiffsEntries[i] == gsDic[doc].keys()[i]:
+##                # in other words, if the scopes (read: the tuple of entry numbers) are the same, then...
+##                    print engineDiffsEntries[i] + " was confused for the correct mim code " + gsDic[doc][gsDic[doc].keys()[j]]
+##                    scopeMatchValueMismatch.append(gsDic[j][0])
+##        print "scope match value mismatch mims: ", scopeMatchValueMismatch
                     
         # Get each gs diff entry (ede -- engine diff entry)
-        for gde in gsDiffsEntries:
-            # Get the key (a tuple) of each gold standard dic item
-            for key in gsDic[doc].keys():
-                # Convert each to a string for easy comparison
-                strGDE = str(gde)
-                strKey = str(key)
-                if strGDE == strKey:
-                    print("same")
-
+##        for gde in gsDiffsEntries:
+##            # Get the key (a tuple) of each gold standard dic item
+##            for key in gsDic[doc].keys():
+##                # Convert each to a string for easy comparison
+##                strGDE = str(gde)
+##                strKey = str(key)
+##                if strGDE == strKey:
+                    #print("same")
         # Checking for overlap
 
 ##        print("\nOverlap handling\n")
@@ -421,16 +428,15 @@ for doc in docs:
 ##                        break
 ##                if incompleteOverlaps > 0 or completeOverlaps > 0:
 ##                    break
-
         #print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
         #print scopeMatchValueMismatch
         #print "\n"
-        scopeMatchValueMismatchEntryNums = [entryNum for entryNum in scopeMatchValueMismatch]
-        entryJustNumsList = []
-        for entry in scopeMatchValueMismatchEntryNums:
-            for subentry in entry:
-                entryJustNumsList.append(subentry.split("_")[1])
-
+##        scopeMatchValueMismatchEntryNums = [entryNum for entryNum in scopeMatchValueMismatch]
+##        entryJustNumsList = []
+##        for entry in scopeMatchValueMismatchEntryNums:
+##            for subentry in entry:
+##                entryJustNumsList.append(subentry.split("_")[1])
+##
         # Checking for scope mismatch, value match (Overlapping entry numbers, same code value)
         #
         # Test cases: "in October" vs "October" for DATE, "on October 21 1993" and "October 21 1993" as ABSOLUTE_DATE
@@ -439,8 +445,7 @@ for doc in docs:
 ##        print "\n\nScope Mismatch - Value Match MIMs:"
 ##        print "_____________________________________________\n"
 ##        scopeMismatchValueMatch = []
-
-
+##        
 ##        for i in range(len(gsWorkingData)):
 ##            for j in range(len(engineDiffsList)):
 ##                for k in range(len(engineDiffsList[j][0])):
@@ -449,9 +454,7 @@ for doc in docs:
 ##                        scopeMismatchValueMatch.append(engineDiffsList[j]);
 ##        print "Scoping was problematic involving %s MIMs, which were:" % len(scopeMismatchValueMatch)
 ##        print scopeMismatchValueMatch
-
         # Totals
-        
         finalData = {}
         # initialize final data with 0-counts
         for value in matrixValues:
@@ -476,7 +479,6 @@ print 'False Positives: ' + str(falsePosCount)
 
 print 'Precision (TP/TP+FP): ' + str(float(truePosCount)/float(truePosCount+falsePosCount))
 print 'Recall (TP/TP+FN): ' + str(float(truePosCount)/float(truePosCount+falseNegCount))
-
 
 #
 # HTML Output
@@ -526,19 +528,19 @@ headerRow.extend(blankTableHeader)
 
 #adding all test labels and stats labels as headers for the matrix table
 engineHeader = TElement('th', text="Engine:", parent=headerRow)
-engineHeader.attrib['style'] = "background: #b01c38;"
+engineHeader.attrib['style'] = "background: #0962ac;"
 tableHeaders = [ TElement('th', text=column[0]) for column in values]
-tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#b01c38;'}))
-tableHeaders.append(TElement('th', text="Fscore", attrib={'style':'background:#b01c38;'}))
-tableHeaders.append(TElement('th', text="mRecall", attrib={'style':'background:#b01c38'}))
-tableHeaders.append(TElement('th', text='mPrecision', attrib={'style':'background:#b01c38;'}))
+tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#0962ac;'}))
+tableHeaders.append(TElement('th', text="Fscore", attrib={'style':'background:#0962ac;'}))
+tableHeaders.append(TElement('th', text="mRecall", attrib={'style':'background:#0962ac'}))
+tableHeaders.append(TElement('th', text='mPrecision', attrib={'style':'background:#0962ac;'}))
 for th in tableHeaders:
     th.attrib['class'] = "resizable"
 headerRow.extend(engineHeader)
 headerRow.extend(tableHeaders)
 goldBlankRow = TElement('tr', parent=table)
 goldHeader = TElement('th', text="Golds:", parent=goldBlankRow)
-goldHeader.attrib['style'] = "background: #b01c38;"
+goldHeader.attrib['style'] = "background: #0962ac;"
 goldBlankRow.extend(goldHeader)
 
 #for each test label:
@@ -546,17 +548,14 @@ for column in values:
     counter = 0
     tp = 0
     fp = 0
-    fn = 0
     dataRow = TElement('tr', parent=table)
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
     for row in values:
-        # getting the td data for each row in pulling from the confusionMatrix dic
+        fn = fnDic[row]
         comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
-        # appending engine sums
-        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#b01c38; color: #fff'}))
-        #adding either green, orange, white, or blue as background styling to the data
+        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
         for tdElement in comparisonData[:-1]:
             tdElement.attrib['row'] = column[0]
             if tdElement.attrib['column'] == tdElement.attrib['row']:
@@ -569,21 +568,25 @@ for column in values:
             else:
                 tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
             dataRow.extend(tdElement)
-        print "out of loop, tabulated fp: " + str(fp)
-        # f-score
-        comparisonData.append(TElement('td', text="---", attrib={'style':'background:white; color: #404040;'}))
-        # microrecall
-        if tp == 0:
-            comparisonData.append(TElement('td', text="N/A"))
-        elif tp != 0:
-            comparisonData.append(TElement('td', text=str(float(int(tp))/(int(tp) + int(fn))), attrib={'style':'background:white; color: #404040;'})) # tp/tp+fn
-        # microprecision
-        if tp == 0:
-            comparisonData.append(TElement('td', text="N/A"))
-        elif tp != 0:
-            print "dividing " + str(float(int(tp))) + " by " + str(int(tp) + int(fp)) + " where there are %s fp's" % fp
-            comparisonData.append(TElement('td', text=str(float(int(tp))/(int(tp) + int(fp))), attrib={'style':'background:white; color: #404040;'})) #tp/tp+fp
+        print "fn ", fn, " for row ", row
+        # print "out of loop, tabulated fp: " + str(fp)
+        if tp != 0:
+            # fscore
+            print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+            print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+            fscore = TElement('td', text=str((2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))/((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))), attrib={'style':'background:white; color: #404040;'})
+            print "fscore value: ", fscore.text
+            comparisonData.append(fscore)
+            # microrecall
+            comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fn)))), attrib={'style':'background:white; color: #404040;'})) # tp/tp+fn
+            # microprecision
+            print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
+            comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fp)))), attrib={'style':'background:white; color: #404040;'})) #tp/tp+fp
             break
+        elif tp == 0:
+            comparisonData.append(TElement('td', text="N/A"))
+            comparisonData.append(TElement('td', text="N/A"))
+            comparisonData.append(TElement('td', text="N/A"))
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
@@ -595,19 +598,13 @@ for column in values:
 
 #Generating tds for tabulations of columns        
 engSumsTr = TElement('tr', parent=table)
-engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#b01c38;'})
+engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#0962ac;'})
 engSumsBlankTd = TElement('td', parent=engSumsTr)
 for i in range(len(listMatrix)):
     td = 0
     for j in range(len(listMatrix[i])):
         td += listMatrix[j][i]
-    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#b01c38; color: #fff'})
-
-
-#Microprecision
-#for tdElement in comparisonData:   
-#str(float(truePosCount)/float(truePosCount+falsePosCount))
-
+    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#0962ac; color: #fff'})
 
 
 emptySpacing = TElement('p', parent=body)
