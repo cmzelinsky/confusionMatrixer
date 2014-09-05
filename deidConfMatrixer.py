@@ -77,15 +77,15 @@ def KWIC(truePositivesMaster):
         contents = parsedDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
         entryTuples = [FPtuples for FPtuples in errors[doc]['FP']]
-        print doc + ": "
-        print "entryTuples (before) : ", entryTuples
+        #print doc + ": "
+        #print "entryTuples (before) : ", entryTuples
         entryTuples.extend([FNtuples for FNtuples in errors[doc]['FN']])
-        print "entryTuples (after) : ", entryTuples
+        #print "entryTuples (after) : ", entryTuples
         for entry in entryTuples:
             if type(entry) != tuple:
-                print "type of entry wasn't a tuple!"
-                print type(entry)
-                print "the entry type wasn't a tuple, and so attempting to reinsert " + entry + " at the same index as a tuple"
+                #print "type of entry wasn't a tuple!"
+                #print type(entry)
+                #print "the entry type wasn't a tuple, and so attempting to reinsert " + entry + " at the same index as a tuple"
                 entryTuples.insert(entryTuples.index(entry),(entry,))
                 entryTuples.remove(entry)
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
@@ -93,14 +93,17 @@ def KWIC(truePositivesMaster):
             if content.firstChild is not None:
                 wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
-        print wordDict
+        #print doc
+        #print wordDict
         for i in range(len(wordDict)):
-            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document) 
-            if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
-                if '&' in wordDict['entry_' + str(i)]:
-                    outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
-                else:
-                    outputParagraph.append(wordDict['entry_' + str(i)])
+            # Aaaaaaaaaaaaaa new tokenization means a kind of wacky hack around this that will definitely lead to some missing parts of sentences...
+            if 'entry_' + str(i) in wordDict:
+            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document)
+                if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
+                    if '&' in wordDict['entry_' + str(i)]:
+                        outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
+                    else:
+                        outputParagraph.append(wordDict['entry_' + str(i)])
         #for entries in entryTuples:
             #pass
             #for entry in entries:
@@ -114,12 +117,12 @@ def KWIC(truePositivesMaster):
         for entry in entryTuples:
             for i in range(len(wordDict)):
                 if ('entry_' + str(i),) == entry : #or 'entry_' + str(i) == entry in:
-                    if entry in errors[doc]['FP']:
+                    if entry in errors[doc]['FP'] and entry in wordDict.keys():
                         if entry not in gsDic[doc]:
                             outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="ENGINE_ONLY_ENTRY" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
                         else:
                             outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-                    elif entry in errors[doc]['FN']:
+                    elif entry in errors[doc]['FN'] and entry in wordDict.keys():
                         outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="GS_ONLY_ENTRY" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
@@ -556,20 +559,19 @@ for column in values:
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
     fn = fnDic[column]
-    for row in values:
-        comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
-        #print "fn ", fn, " for row ", row
-        for tdElement in comparisonData:
-            tdElement.attrib['row'] = column[0]
-            if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
-                tp = int(tdElement.text)
-                tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
-            elif not 'style' in tdElement.attrib and tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
-                fp += int(tdElement.text)
-                tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
-            elif not 'style' in tdElement.attrib:
-                tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
-            dataRow.extend(tdElement)
+    comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
+    #print "fn ", fn, " for row ", row
+    for tdElement in comparisonData:
+        tdElement.attrib['row'] = column[0]
+        if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
+            tp = int(tdElement.text)
+            tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
+        elif not 'style' in tdElement.attrib and tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
+            fp += int(tdElement.text)
+            tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
+        elif not 'style' in tdElement.attrib:
+            tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
+        dataRow.extend(tdElement)
     # print "out of loop, tabulated fp: " + str(fp)
     comparisonData.append(TElement('td', text=str(fnDic[column]), attrib={'style':'background:#0962ac; color:#fff'}))
     comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
