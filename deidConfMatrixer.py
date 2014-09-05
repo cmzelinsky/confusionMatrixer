@@ -83,6 +83,7 @@ def KWIC(truePositivesMaster):
         print "entryTuples (after) : ", entryTuples
         for entry in entryTuples:
             if type(entry) != tuple:
+                print "type of entry wasn't a tuple!"
                 print type(entry)
                 print "the entry type wasn't a tuple, and so attempting to reinsert " + entry + " at the same index as a tuple"
                 entryTuples.insert(entryTuples.index(entry),(entry,))
@@ -92,6 +93,7 @@ def KWIC(truePositivesMaster):
             if content.firstChild is not None:
                 wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
             #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
+        print wordDict
         for i in range(len(wordDict)):
             # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document) 
             if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
@@ -530,7 +532,8 @@ headerRow.extend(blankTableHeader)
 engineHeader = TElement('th', text="Engine:", parent=headerRow)
 engineHeader.attrib['style'] = "background: #0962ac;"
 tableHeaders = [ TElement('th', text=column[0]) for column in values]
-tableHeaders.append(TElement('th', text="Eng Sum", attrib={'style':'background:#0962ac;'}))
+tableHeaders.append(TElement('th', text="FNs", attrib={'style':'background:#0962ac'}))
+tableHeaders.append(TElement('th', text="Tp+Fp", attrib={'style':'background:#0962ac;'}))
 tableHeaders.append(TElement('th', text="Fscore", attrib={'style':'background:#0962ac;'}))
 tableHeaders.append(TElement('th', text="mRecall", attrib={'style':'background:#0962ac'}))
 tableHeaders.append(TElement('th', text='mPrecision', attrib={'style':'background:#0962ac;'}))
@@ -552,41 +555,40 @@ for column in values:
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
+    fn = fnDic[column]
     for row in values:
-        fn = fnDic[row]
         comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
-        comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
-        for tdElement in comparisonData[:-1]:
+        #print "fn ", fn, " for row ", row
+        for tdElement in comparisonData:
             tdElement.attrib['row'] = column[0]
-            if tdElement.attrib['column'] == tdElement.attrib['row']:
+            if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
                 tp = int(tdElement.text)
                 tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
-            elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
+            elif not 'style' in tdElement.attrib and tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
                 fp += int(tdElement.text)
-                print "current fp: " + str(fp)
                 tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
-            else:
+            elif not 'style' in tdElement.attrib:
                 tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
             dataRow.extend(tdElement)
-        print "fn ", fn, " for row ", row
-        # print "out of loop, tabulated fp: " + str(fp)
-        if tp != 0:
-            # fscore
-            print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
-            print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
-            fscore = TElement('td', text=str((2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))/((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))), attrib={'style':'background:white; color: #404040;'})
-            print "fscore value: ", fscore.text
-            comparisonData.append(fscore)
-            # microrecall
-            comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fn)))), attrib={'style':'background:white; color: #404040;'})) # tp/tp+fn
-            # microprecision
-            print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
-            comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fp)))), attrib={'style':'background:white; color: #404040;'})) #tp/tp+fp
-            break
-        elif tp == 0:
-            comparisonData.append(TElement('td', text="N/A"))
-            comparisonData.append(TElement('td', text="N/A"))
-            comparisonData.append(TElement('td', text="N/A"))
+    # print "out of loop, tabulated fp: " + str(fp)
+    comparisonData.append(TElement('td', text=str(fnDic[column]), attrib={'style':'background:#0962ac; color:#fff'}))
+    comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
+    if tp != 0:
+        # fscore
+        print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+        print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+        fscore = TElement('td', text=str((2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))/((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))), attrib={'style':'background:#0962ac; color: #fff'})
+        print "fscore value: ", fscore.text
+        comparisonData.append(fscore)
+        # microrecall
+        comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fn)))), attrib={'style':'background:#0962ac; color: #fff'})) # tp/tp+fn
+        # microprecision
+        print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
+        comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fp)))), attrib={'style':'background:#0962ac; color: #fff'})) #tp/tp+fp
+    elif tp == 0:
+        comparisonData.append(TElement('td', text="N/A"))
+        comparisonData.append(TElement('td', text="N/A"))
+        comparisonData.append(TElement('td', text="N/A"))
     dataRow.extend(rowHeader)
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
