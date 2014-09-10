@@ -431,7 +431,7 @@ for doc in docs:
                     for j in range(len(engKeyTup)):
                         # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
                         if str(gsKeyTup[i]) == str(engKeyTup[j]):
-                            print "verifying code values are equal: " + str(gsDic[doc][gsKeyTup]) + " " + str(engDic[doc][engKeyTup])
+                            #verifying codes are equal
                             if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]:
                                 if str(gsKeyTup) == str(engKeyTup):
                                     completeOverlaps += 1
@@ -457,20 +457,40 @@ for doc in docs:
         print "complete overlap count: " + str(completeOverlaps)
         print "incomplete overlap count: " + str(incompleteOverlaps)
 
+        print "comparison of engine and gs entry tuples to sort out TP from FP overlaps based on criteria"
         if incompOverlaps[doc]:
             for gsTup, engTup in incompOverlaps[doc].items():
                 if len(gsTup) < len(engTup):
+                    print "length of engine tuple: ", len(engTup), " ", engTup, "  length of gs tuple (shorter): ", len(gsTup), " ", gsTup
                     testList = []
                     testList.append('entry_' + str(int(sorted(list(gsTup))[0].split("_")[1])-1))
+                    print "after append #1: ", testList
                     testList.extend(sorted(list(gsTup)))
+                    print "after append #2: ", testList
                     testList.append('entry_' + str(int(sorted(list(gsTup))[-1].split("_")[1])+1))
+                    print "after append #3: ", testList
+                    print "test list " + str(testList) + " vs. engTup " + str(engTup)
                     if len(set(tuple(testList)) & set(engTup)) >= 2/3:
                         finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
                         # think about this to check that this is pulling the proper data. Overlaps inherently come from engine.
                 elif len(engTup) < len(gsTup):
+                    print "length of engine tuple (shorter): ", len(engTup), " ", engTup, "  length of gs tuple: ", len(gsTup), " ", gsTup
                     testList = []
                     testList.append('entry_' + str(int(sorted(list(engTup))[0].split("_")[1])-1))
-                    testList.extend(sorted(list(gsTup)))
+                    print "after append #1: ", testList
+                    testList.extend(sorted(list(engTup)))
+                    print "after append #2: ", testList
                     testList.append('entry_' + str(int(sorted(list(engTup))[-1].split("_")[1])+1))
+                    print "after append #3: ", testList
+                    print "test list " + str(testList) + " vs. gsTup " + str(gsTup)
                     if len(set(tuple(testList)) & set(gsTup)) >= 2/3:
                         finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
+
+print "incomplete overlaps"
+for doc in docs:
+    if not doc.endswith('.out.xml'):
+        print doc
+        print incompOverlaps[doc]
+        print "\n\n\nfinal incomplete overlaps"
+        print finalIncompOverlaps[doc]
+
