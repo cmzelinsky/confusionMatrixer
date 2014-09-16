@@ -39,7 +39,7 @@ def findPair(fname):
 def KWIC(truePositivesMaster):
     """Creates readable xhtml output contexts """
     
-    parser = XMLParser(encoding="utf-8")
+    parser = etree.XMLParser(encoding="utf-8", recover=True)
 
     root = TElement('root')
     html = TElement('html', parent=root)
@@ -69,12 +69,14 @@ def KWIC(truePositivesMaster):
     output = []
     
     for doc in errors:
-        parsedDoc = minidom.parse(findPair(path + '\\' + doc))
+        parsedGsDoc = minidom.parse(path + '\\' + doc)
+        parsedEngDoc = minidom.parse(findPair(path + '\\' + doc))
         paragraphs = []
         outputParagraph = []
         wordDict = {}
         #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
-        contents = parsedDoc.getElementsByTagName('content')
+        contents = parsedEngDoc.getElementsByTagName('content')
+        gsContents = parsedGsDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
         entryTuples = [FPtuples for FPtuples in errors[doc]['FP']]
         #print doc + ": "
@@ -89,41 +91,74 @@ def KWIC(truePositivesMaster):
                 entryTuples.insert(entryTuples.index(entry),(entry,))
                 entryTuples.remove(entry)
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
+        print doc
         for content in contents:
-            if content.firstChild is not None:
-                wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
-            #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
-        #print doc
-        #print wordDict
-        for i in range(len(wordDict)):
-            # Aaaaaaaaaaaaaa new tokenization means a kind of wacky hack around this that will definitely lead to some missing parts of sentences...
-            if 'entry_' + str(i) in wordDict:
-            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document)
-                if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
-                    if '&' in wordDict['entry_' + str(i)]:
-                        outputParagraph.append(wordDict['entry_' + str(i)].replace("&", "&amp;"))
+            for char in ['&', ';', '<', '>']:
+                if content.firstChild is not None:
+                    if char in content.firstChild.nodeValue:
+                        print "char is in nodeValue and about to be replaced"
+                        wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue.replace(char, "")
                     else:
-                        outputParagraph.append(wordDict['entry_' + str(i)])
-        #for entries in entryTuples:
-            #pass
-            #for entry in entries:
-            #looking at each entry number individually , applies the CSS individually -- not sure if i could easily apply the CSS for the full tuple?
-            #if len(entries) > 1:
-            #    for subentry in entries:
-            #        print subentry
-            #        entryTuples.append((subentry,))
-            #    entryTuples.remove(entries)
+                        wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
+##                else:
+##                    gsTempList = []
+##                    engTempList = []
+##                    #append tokens here to take out whitespace and perform string comparison
+##                    gsTempList.append()
+##                    engTempList.append()
+##                        pass
+##                    else:
+##                        wordDict[gsContent.getAttribute('ID')] = gsContent.firstChild.nodeValue
+            #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
+        print doc
+        print wordDict
+        for i in range(len(wordDict)):
+##            # Aaaaaaaaaaaaaa new tokenization means a kind of wacky hack around this that will definitely lead to some missing parts of sentences...
+            if 'entry_' + str(i) in wordDict:
+##            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document)
+##                #if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
+##                if ';' in wordDict['entry_' + str(i)]:
+##                    outputParagraph.append(wordDict['entry_' + str(i)].replace(";", ""))
+##                if '&' in wordDict['entry_' + str(i)]:
+##                    outputParagraph.append(wordDict['entry_' + str(i)].replace("&", ""))
+##                if '>' in wordDict['entry_' + str(i)]:
+##                    outputParagraph.append(wordDict['entry_' + str(i)].replace(">", ""))
+##                if '<' in wordDict['entry_' + str(i)]:
+##                    outputParagraph.append(wordDict['entry_' + str(i)].replace("<", ""))
+                outputParagraph.append(wordDict['entry_' + str(i)])
 
+        print wordDict
         for entry in entryTuples:
             for i in range(len(wordDict)):
+                #should be range(len(wordDict)) but aaaaghh tokenization
                 if ('entry_' + str(i),) == entry : #or 'entry_' + str(i) == entry in:
-                    if entry in errors[doc]['FP'] and entry in wordDict.keys():
+                    if entry in errors[doc]['FP']:
                         if entry not in gsDic[doc]:
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="ENGINE_ONLY_ENTRY" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                            print doc
+                            print i
+                            #if getting an error, it's definitely the engDic[doc] thing and it's
+                            ###### WANT TO NOT DO THINGS ONE TOKEN BY ONE TOKEN, BUT RATHER TAKE THE LAST entry num in the tuple and skip to that + 1 to continue from that i
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
                         else:
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(errors[doc]['FP'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-                    elif entry in errors[doc]['FN'] and entry in wordDict.keys():
-                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="GS_ONLY_ENTRY" eng="' + str(errors[doc]['FN'][entry])  + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                    elif entry in errors[doc]['FN']:
+                        print doc
+                        print i
+                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                else:
+                    for multEntryFP in errors[doc]['FP'].keys():
+                        if ('entry_' + str(i),) in multEntryFP:
+                            if multEntryFP not in gsDic[doc]:
+                                outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(multEntryFP) + '"eng="' + engDic[doc][multEntryFP] + '">' + "".join([wordDict[entryNum] for entryNum in multEntryFP]) + '</error></strong></font>'
+                                print "FP- i was: " + i
+                                i = int(multEntryFP[-1].split("_")[1])+1
+                                print "and now i is: " + i
+                    for multEntryFN in errors[doc]['FN'].keys():
+                        if ('entry_' + str(i),) in multEntryFN:
+                            outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(multEntryFN) + '"gs="' + gsDic[doc][multEntryFN] + '">' + "".join([wordDict[entryNum] for entryNum in multEntryFN]) + '</error></strong></font>'
+                            print "FN- i was: " + i
+                            i = int(multEntryFN[-1].split("_")[1])+1
+                            print "and now i is: " + i
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
     output = "<contexts>" + "".join(output) + "</contexts>"
@@ -152,6 +187,13 @@ def KWIC(truePositivesMaster):
         for i in range(len(root)):
             outputFile.write(ET.tostring(root[i]))
     outputFile.close()
+
+    print "entry tuples: ", entryTuples
+    print "last errors[doc] (should be 1:1 but check): ", errors[doc]['FP']
+    print ""
+    print "convert over to using gsDiffs and engDiffs so as to not have to use one-to-one, ONLY if it's going to make overlaps easier"
+    print "gsDiffs: ", gsDiffs
+    print "engDiffs: ", engDiffs
 
 
 class TElement(ET._Element):
@@ -183,6 +225,11 @@ truePosCount = 0
 falseNegCount = 0
 falsePosCount = 0
 confusionMatrix = {}
+incompOverlaps = {}
+compOverlaps = {}
+finalIncompOverlaps = {}
+truePosFromOverlaps = {}
+truePosWithOverlaps = {}
 
 #for engine only or gs only MIMs
 fnDic = {}
@@ -201,12 +248,13 @@ truePositives = {}
 gsDic = {}
 engDic = {}
 
+
 for doc in docs:
     if not doc.endswith('.out.xml'):
         docCount += 1
         
         print "\n\n_______________________________________\n"
-        print "Now parsing document %s out of %s..." % (docCount, len(docs)/2)
+        print "Now running document %s out of %s..." % (docCount, len(docs)/2)
         print "_______________________________________\n\n"
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngDoc = parse(findPair(path + '\\' + doc))
@@ -232,11 +280,12 @@ for doc in docs:
             for child in entry.firstChild.childNodes:
                 if child.localName == 'binding':
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
-                    entries = tuple(str(binding) for binding in bindings if len(binding)>0)
+                    entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     gsDic[doc][entries] = value
         for k, v in gsDic[doc].items():
             gsDic[doc][k] = tuple(v)
+            
 
         #print "gsDic : ", gsDic 
                         
@@ -252,7 +301,7 @@ for doc in docs:
             for child in entry.firstChild.childNodes:
                 if child.localName == 'binding':
                     bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
-                    entries = tuple(str(binding) for binding in bindings if len(binding)>0)
+                    entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     if entries in engDic[doc]:
                         engDic[doc][entries].append("".join(value))
@@ -385,7 +434,8 @@ for doc in docs:
         # Checking for scope match, value mismatch (Same entry number, different code value):
 ##        scopeMatchValueMismatch = []
 
-##        print("~")
+##        print("~")engDiffs
+        
 ##        print "engine diffs entries: ", engineDiffsEntries
 ##        print("-----")
 ##        print "gs diffs entries: ", gsDiffsEntries
@@ -398,41 +448,121 @@ for doc in docs:
 ##                    print engineDiffsEntries[i] + " was confused for the correct mim code " + gsDic[doc][gsDic[doc].keys()[j]]
 ##                    scopeMatchValueMismatch.append(gsDic[j][0])
 ##        print "scope match value mismatch mims: ", scopeMatchValueMismatch
-                    
+        
+        # GS Diffs = False negatives...             
         # Get each gs diff entry (ede -- engine diff entry)
-##        for gde in gsDiffsEntries:
+##        for entry in gsDiffsEntries:
 ##            # Get the key (a tuple) of each gold standard dic item
 ##            for key in gsDic[doc].keys():
 ##                # Convert each to a string for easy comparison
-##                strGDE = str(gde)
+##                strGDE = str(entry)
 ##                strKey = str(key)
 ##                if strGDE == strKey:
                     #print("same")
         # Checking for overlap
+        print "\nOverlap handling\n"
+        incompOverlaps[doc] = {}
+        compOverlaps[doc] = {}
+        finalIncompOverlaps[doc] = {}
+        incompleteOverlaps = 0
+        completeOverlaps = 0
+        for gsKeyTup in gsDic[doc].keys():
+            for i in range(len(gsKeyTup)):
+                for engKeyTup in engDic[doc].keys():
+                    for j in range(len(engKeyTup)):
+                        # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
+                        if str(gsKeyTup[i]) == str(engKeyTup[j]):
+                            #verifying codes are equal
+                            if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]:
+                                if str(gsKeyTup) == str(engKeyTup):
+                                    completeOverlaps += 1
+                                    #print str(gsKeyTup)
+                                    #print str(engKeyTup)
+                                    print "Complete overlap occurs in " + str(gsKeyTup) + ", " + str(engKeyTup)
+                                    print("%%%%%%%Complete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+                                    #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
+                                    compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
+                                else:
+                                    print "Incomplete overlap occurs in" + str(gsKeyTup) + ", " + str(engKeyTup)
+                                    print("&&&&&&&Incomplete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup) + "&&&&&&&&&&&&")
+                                    if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
+                                        incompOverlaps[doc][gsKeyTup] = engKeyTup
+                                    incompleteOverlaps += 1
+                    if completeOverlaps > 0 or incompleteOverlaps > 0:
+                        #print str(gsKeyTup) + " : " + str(engKeyTup)
+                        #print str(gsDic[doc][gsKeyTup]) + " : " + str(engDic[doc][engKeyTup])
+                        #print("/////////////////////")
+                        break
+                if incompleteOverlaps > 0 or completeOverlaps > 0:
+                    break
+        print "complete overlap count: " + str(completeOverlaps)
+        print "incomplete overlap count: " + str(incompleteOverlaps)
 
-##        print("\nOverlap handling\n")
-##        incompleteOverlaps = 0
-##        completeOverlaps = 0
-##        for gsKeyTup in gsDic.keys():
-##            for i in range(len(gsKeyTup)):
-##                for engKeyTup in engDic.keys():
-##                    for j in range(len(engKeyTup)):
-##                        # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
-##                        if str(gsKeyTup[i]) == str(engKeyTup[j]):
-##                            if str(gsKeyTup) == str(engKeyTup):
-##                                completeOverlaps += 1
-##                                print str(gsKeyTup)
-##                                print str(engKeyTup)
-##                                print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-##                            else:
-##                                incompleteOverlaps += 1
-##                    if completeOverlaps > 0 or incompleteOverlaps > 0:
-##                        print str(gsKeyTup) + " : " + str(engKeyTup)
-##                        print str(gsDic[gsKeyTup]) + " : " + str(engDic[engKeyTup])
-##                        print("/////////////////////")
-##                        break
-##                if incompleteOverlaps > 0 or completeOverlaps > 0:
-##                    break
+        print "comparison of engine and gs entry tuples to sort out TP from FP overlaps based on criteria"
+        if incompOverlaps[doc]:
+            for gsTup, engTup in incompOverlaps[doc].items():
+                truePosFromOverlaps[doc] = {}
+                if len(gsTup) < len(engTup):
+                    print "length of engine tuple: ", len(engTup), " ", engTup, "  length of gs tuple (shorter): ", len(gsTup), " ", gsTup
+                    testList = []
+                    testList.append('entry_' + str(int(sorted(list(gsTup))[0].split("_")[1])-1))
+                    print "after append #1: ", testList
+                    testList.extend(sorted(list(gsTup)))
+                    print "after append #2: ", testList
+                    testList.append('entry_' + str(int(sorted(list(gsTup))[-1].split("_")[1])+1))
+                    print "after append #3: ", testList
+                    print "test list " + str(tuple(testList)) + " vs. engTup " + str(engTup)
+                    if len(gsTup)*1.0 / len(engTup) >= 3/4:
+                        truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
+                    elif len(tuple(testList))*1.0 / len(engTup) >= 2/3:
+                        if tuple(sorted(testList)) == tuple(sorted(list(engTup))):
+                            #TP!
+                            truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
+                        else:
+                            #FP...
+                            finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
+                    else:
+                        finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
+                        
+                elif len(engTup) < len(gsTup):
+                    print "length of engine tuple (shorter): ", len(engTup), " ", engTup, "  length of gs tuple: ", len(gsTup), " ", gsTup
+                    testList = []
+                    testList.append('entry_' + str(int(sorted(list(engTup))[0].split("_")[1])-1))
+                    print "after append #1: ", testList
+                    testList.extend(sorted(list(engTup)))
+                    print "after append #2: ", testList
+                    testList.append('entry_' + str(int(sorted(list(engTup))[-1].split("_")[1])+1))
+                    print "after append #3: ", testList
+                    print "test list " + str(testList) + " vs. gsTup " + str(gsTup)
+                    if len(engTup)*1.0 / len(gsTup) >= 3/4: #75% match condition
+                        truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
+                    elif len(tuple(testList))*1.0 / len(gsTup) >= 2/3: #this and next 'if' statement being the "plus or minus one token on either side" condition
+                        if tuple(sorted(testList)) == tuple(sorted(list(gsTup))):
+                            #TP!
+                            truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
+                        else:
+                            #FP...
+                            finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
+                    else:
+                        finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
+##
+##print "incomplete overlaps"
+##for doc in docs:
+##    if not doc.endswith('.out.xml'):
+##        print "________________________________________________________"
+##        print doc
+##        print "\n\n TPs!"
+##        if doc in truePosFromOverlaps:
+##            print truePosFromOverlaps[doc]
+##        print "\n\n\nfinal incomplete overlaps"
+##        print finalIncompOverlaps[doc]
+                        
+            #want to compbine the true positives and the overlap-derived true positives so as to retake statistics on these separately
+            #this method below is wrong though -- need to put any additional overlaps in the same document.
+            
+            truePosWithOverlaps[doc] = {}
+            truePosWithOverlaps[doc] = dict(truePosFromOverlaps[doc].items() + truePositives[doc].items())
+        
         #print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
         #print scopeMatchValueMismatch
         #print "\n"
@@ -484,6 +614,8 @@ print 'False Positives: ' + str(falsePosCount)
 
 print 'Precision (TP/TP+FP): ' + str(float(truePosCount)/float(truePosCount+falsePosCount))
 print 'Recall (TP/TP+FN): ' + str(float(truePosCount)/float(truePosCount+falseNegCount))
+
+
 
 #
 # HTML Output
