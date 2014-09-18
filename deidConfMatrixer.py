@@ -9,15 +9,12 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.
 ## 2)	There is no link from confusion matrix to details files."
 ##
-import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections, repr
+import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
-from xml.dom import minidom
 import xml.etree.ElementTree as ET
-from xml.etree.ElementTree import ElementTree
-from xml.etree.ElementTree import Element, tostring, SubElement, XML
-from xml.etree.ElementTree import XMLParser
+from xml.etree.ElementTree import ElementTree, Element, tostring, SubElement, XML, XMLParser
 from lxml import etree
 
 
@@ -35,8 +32,7 @@ def findPair(fname):
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
 
-
-def KWIC(truePositivesMaster):
+def KWIC():
     """Creates readable xhtml output contexts """
     
     parser = etree.XMLParser(encoding="utf-8", recover=True)
@@ -65,106 +61,78 @@ def KWIC(truePositivesMaster):
     values = sorted([key for key in confusionMatrix.keys()])
     body = TElement('body', parent=html)
     h1 = TElement('h1', text="Error contexts:", parent=body)
+    colorKey = TElement('p', text="Key:", parent=body)
+    fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:150px;'})
+    fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:150px;'})
 
     output = []
     
-    for doc in errors:
+    for doc in diffsDic:
         parsedGsDoc = minidom.parse(path + '\\' + doc)
         parsedEngDoc = minidom.parse(findPair(path + '\\' + doc))
         paragraphs = []
         outputParagraph = []
         wordDict = {}
-        #paragraphs = parsedDoc.getElementsByTagName('paragraphs')
         contents = parsedEngDoc.getElementsByTagName('content')
         gsContents = parsedGsDoc.getElementsByTagName('content')
         #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
-        entryTuples = [FPtuples for FPtuples in errors[doc]['FP']]
-        #print doc + ": "
-        #print "entryTuples (before) : ", entryTuples
-        entryTuples.extend([FNtuples for FNtuples in errors[doc]['FN']])
-        #print "entryTuples (after) : ", entryTuples
+        entryTuples = [FPtuples for FPtuples in diffsDic[doc]['FP']]
+        entryTuples.extend([FNtuples for FNtuples in diffsDic[doc]['FN']])
         for entry in entryTuples:
             if type(entry) != tuple:
-                #print "type of entry wasn't a tuple!"
-                #print type(entry)
-                #print "the entry type wasn't a tuple, and so attempting to reinsert " + entry + " at the same index as a tuple"
                 entryTuples.insert(entryTuples.index(entry),(entry,))
                 entryTuples.remove(entry)
         #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
-        print doc
+                
         for content in contents:
             for char in ['&', ';', '<', '>']:
                 if content.firstChild is not None:
                     if char in content.firstChild.nodeValue:
-                        print "char is in nodeValue and about to be replaced"
                         wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue.replace(char, "")
                     else:
                         wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
-##                else:
-##                    gsTempList = []
-##                    engTempList = []
-##                    #append tokens here to take out whitespace and perform string comparison
-##                    gsTempList.append()
-##                    engTempList.append()
-##                        pass
-##                    else:
-##                        wordDict[gsContent.getAttribute('ID')] = gsContent.firstChild.nodeValue
-            #entry number to token dictionary, looks like {u'entry_567': u'this ', u'entry_566': u'Boston ', u'entry_565': u'in ', u'entry_564': u'appointment '
-        print doc
-        print wordDict
+
         for i in range(len(wordDict)):
-##            # Aaaaaaaaaaaaaa new tokenization means a kind of wacky hack around this that will definitely lead to some missing parts of sentences...
             if 'entry_' + str(i) in wordDict:
-##            # Preprocessing (getting a problem with parser not able to handle u'<INC ', u'00:04:36> ' -type of markup in the document)
-##                #if not '>' in wordDict['entry_' + str(i)] and not '<' in wordDict['entry_' + str(i)] and not ';' in wordDict['entry_' + str(i)]:
-##                if ';' in wordDict['entry_' + str(i)]:
-##                    outputParagraph.append(wordDict['entry_' + str(i)].replace(";", ""))
-##                if '&' in wordDict['entry_' + str(i)]:
-##                    outputParagraph.append(wordDict['entry_' + str(i)].replace("&", ""))
-##                if '>' in wordDict['entry_' + str(i)]:
-##                    outputParagraph.append(wordDict['entry_' + str(i)].replace(">", ""))
-##                if '<' in wordDict['entry_' + str(i)]:
-##                    outputParagraph.append(wordDict['entry_' + str(i)].replace("<", ""))
                 outputParagraph.append(wordDict['entry_' + str(i)])
 
-        print wordDict
+        #Compare the errors (entryTuples) to the indexes in the outputParagraph to see which indexes need to be overwritten
         for entry in entryTuples:
+            i = 0
             for i in range(len(wordDict)):
-                #should be range(len(wordDict)) but aaaaghh tokenization
-                if ('entry_' + str(i),) == entry : #or 'entry_' + str(i) == entry in:
-                    if entry in errors[doc]['FP']:
-                        if entry not in gsDic[doc]:
-                            print doc
-                            print i
-                            #if getting an error, it's definitely the engDic[doc] thing and it's
-                            ###### WANT TO NOT DO THINGS ONE TOKEN BY ONE TOKEN, BUT RATHER TAKE THE LAST entry num in the tuple and skip to that + 1 to continue from that i
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-                        else:
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-                    elif entry in errors[doc]['FN']:
-                        print doc
-                        print i
-                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
-                else:
-                    for multEntryFP in errors[doc]['FP'].keys():
-                        if ('entry_' + str(i),) in multEntryFP:
-                            if multEntryFP not in gsDic[doc]:
-                                outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(multEntryFP) + '"eng="' + engDic[doc][multEntryFP] + '">' + "".join([wordDict[entryNum] for entryNum in multEntryFP]) + '</error></strong></font>'
-                                print "FP- i was: " + i
-                                i = int(multEntryFP[-1].split("_")[1])+1
-                                print "and now i is: " + i
-                    for multEntryFN in errors[doc]['FN'].keys():
-                        if ('entry_' + str(i),) in multEntryFN:
-                            outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(multEntryFN) + '"gs="' + gsDic[doc][multEntryFN] + '">' + "".join([wordDict[entryNum] for entryNum in multEntryFN]) + '</error></strong></font>'
-                            print "FN- i was: " + i
-                            i = int(multEntryFN[-1].split("_")[1])+1
-                            print "and now i is: " + i
+                #Single token entry handling:
+                if ('entry_' + str(i),) == entry and len(entry) == 1:
+                    #Something in the error list occurs at index i -- need to overwrite for this i and for this entry num
+                    if entry in diffsDic[doc]['FP']:
+                        #had added this next line to control flow to list / dic indexes because of an error when assigning @eng and @gs
+                        #if entry not in gsDic[doc]:
+                        #if getting an error, it's definitely from the engDic[doc]
+                        if entry not in gsDic[doc].keys():
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        elif entry in gsDic[doc].keys():
+                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                    elif entry in diffsDic[doc]['FN']:
+                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
+                    #('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
+                    #Multi-entry token handling:
+                    if entry in diffsDic[doc]['FP'].keys():
+                            #Need to feed in a data structure that will for each entry do the color overlapping
+                        for j in range(0, len(entry)):
+                            if entry not in gsDic[doc].keys():
+                                outputParagraph[i+j] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                            elif entry in gsDic[doc].keys():
+                                outputParagraph[i+j] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                    elif entry in diffsDic[doc]['FN'].keys():
+                        for j in range(0, len(entry)):
+                            outputParagraph[i+j] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                    i += len(entry)
+
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
     output = "<contexts>" + "".join(output) + "</contexts>"
 
     allContexts = path + "allContexts.xhtml"
-    
     with open(os.path.join(path, allContexts), 'w') as allContextsXML:
         allContextsXML.write(output)
     allContextsXML.close()
@@ -188,12 +156,9 @@ def KWIC(truePositivesMaster):
             outputFile.write(ET.tostring(root[i]))
     outputFile.close()
 
-    print "entry tuples: ", entryTuples
-    print "last errors[doc] (should be 1:1 but check): ", errors[doc]['FP']
-    print ""
-    print "convert over to using gsDiffs and engDiffs so as to not have to use one-to-one, ONLY if it's going to make overlaps easier"
-    print "gsDiffs: ", gsDiffs
-    print "engDiffs: ", engDiffs
+    #want to do a findall for each combination of error and FN combinations greater than 0
+    print '\nDetails file(s) generated -- written to ' + path
+    print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
 
 
 class TElement(ET._Element):
@@ -230,11 +195,11 @@ compOverlaps = {}
 finalIncompOverlaps = {}
 truePosFromOverlaps = {}
 truePosWithOverlaps = {}
+diffsDic = {}
+overlapsForKWIC = {}
 
 #for engine only or gs only MIMs
-fnDic = {}
-fpDic = {}
-        # will be used in referencing FN and FP (for MIMs occuring only in the engine) counts in the matrix table rendering below
+# will be used in referencing FN and FP (for MIMs occuring only in the engine) counts in the matrix table rendering below
 fnDic = {}
 for value in matrixValues:
     fnDic[value] = 0
@@ -285,12 +250,8 @@ for doc in docs:
                     gsDic[doc][entries] = value
         for k, v in gsDic[doc].items():
             gsDic[doc][k] = tuple(v)
-            
-
-        #print "gsDic : ", gsDic 
                         
         # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
-
         # --> Create alert that funnels gs documents having overlapping MIMs and output at end of script
         
         ## Establishing the engine data structures
@@ -340,8 +301,14 @@ for doc in docs:
         #False negatives:
         gsDiffs = {entry:gsDic[doc][entry] for entry in gsDic[doc] if entry not in engDic[doc]}
         #False positives: 
-        engDiffs = {entry:engDic[doc][entry] for entry in engDic[doc] if entry not in gsDic[doc]}
+        engDiffs = {entry:engDic[doc][entry] for entry in engDic[doc] if ((entry not in gsDic[doc]) or (entry in gsDic[doc] and gsDic[doc][entry] != engDic[doc][entry]))}
+        #including each kind of fp -- 1) FPs that aren't in the gold standard (e.g. "He" as a last name).
+        # 2) FPs that are in the gold standard but don't have the same code (e.g. what's in the matrix table).
 
+        diffsDic[doc] = {}
+        diffsDic[doc]['FP'] = engDiffs
+        diffsDic[doc]['FN'] = gsDiffs
+        
         engDiffsOneToOne = {}
         for entry in engDiffs:
             if len(entry) > 1:
@@ -417,37 +384,15 @@ for doc in docs:
         print "_____________________________________________\n"
         print "In gold standard version but not in engine version (false negatives): (x%s found)" % len(gsDiffs)
         falseNegCount += len(gsDiffs)
-        #print gsDiffs
         print ""
-        #print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engDiffs)
+        print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engDiffs)
         falsePosCount += len(engDiffs)
-        #print engDiffs
         print "\n\n"
         ### engineDiffs will contain false positives, scopeMismatchValueMatches, and ScopeMatchValueMismatch
         
-        # Checking for false positives:
-        #  defining false positives as just what falls in the above after mismatches are picked out ###
         gsDiffsEntries = gsDiffs.keys()
         engineDiffsEntries = engDiffs.keys()
         engDiffsEntries = engineDiffsEntries
-        
-        # Checking for scope match, value mismatch (Same entry number, different code value):
-##        scopeMatchValueMismatch = []
-
-##        print("~")engDiffs
-        
-##        print "engine diffs entries: ", engineDiffsEntries
-##        print("-----")
-##        print "gs diffs entries: ", gsDiffsEntries
-##        print("~")
-##        for i in range(len(engDiffsEntries)):
-##            for j in range(len(gsDic[doc])):
-##            # Comparing against true positives
-##                if engDiffsEntries[i] == gsDic[doc].keys()[i]:
-##                # in other words, if the scopes (read: the tuple of entry numbers) are the same, then...
-##                    print engineDiffsEntries[i] + " was confused for the correct mim code " + gsDic[doc][gsDic[doc].keys()[j]]
-##                    scopeMatchValueMismatch.append(gsDic[j][0])
-##        print "scope match value mismatch mims: ", scopeMatchValueMismatch
         
         # GS Diffs = False negatives...             
         # Get each gs diff entry (ede -- engine diff entry)
@@ -461,6 +406,7 @@ for doc in docs:
                     #print("same")
         # Checking for overlap
         print "\nOverlap handling\n"
+        overlapsForKWIC[doc] = []
         incompOverlaps[doc] = {}
         compOverlaps[doc] = {}
         finalIncompOverlaps[doc] = {}
@@ -471,27 +417,25 @@ for doc in docs:
                 for engKeyTup in engDic[doc].keys():
                     for j in range(len(engKeyTup)):
                         # If any value within the gsKey's tuple overlaps with the engineKey's tuple, count it as an overlap
-                        if str(gsKeyTup[i]) == str(engKeyTup[j]):
+                        if str(gsKeyTup[i]) == str(engKeyTup[j]):   #if one token from each gs and eng tuples are the same
                             #verifying codes are equal
-                            if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]:
-                                if str(gsKeyTup) == str(engKeyTup):
-                                    completeOverlaps += 1
-                                    #print str(gsKeyTup)
-                                    #print str(engKeyTup)
-                                    print "Complete overlap occurs in " + str(gsKeyTup) + ", " + str(engKeyTup)
-                                    print("%%%%%%%Complete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup) + "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-                                    #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
-                                    compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
-                                else:
-                                    print "Incomplete overlap occurs in" + str(gsKeyTup) + ", " + str(engKeyTup)
-                                    print("&&&&&&&Incomplete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup) + "&&&&&&&&&&&&")
-                                    if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
-                                        incompOverlaps[doc][gsKeyTup] = engKeyTup
-                                    incompleteOverlaps += 1
+                            #if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]: #if codes are the same 
+                            if str(gsKeyTup) == str(engKeyTup): 
+                                completeOverlaps += 1
+                                #print str(gsKeyTup)
+                                #print str(engKeyTup)
+                                print "Complete overlap occurs in " + str(gsKeyTup) + ", " + str(engKeyTup)
+                                print(str(engKeyTup[j]) + " " + str(engKeyTup))
+                                #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
+                                compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
+                            else:
+                                print "Incomplete overlap occurs in" + str(gsKeyTup) + ", " + str(engKeyTup)
+                                print("Incomplete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup))
+                                if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
+                                    incompOverlaps[doc][gsKeyTup] = engKeyTup
+                                incompleteOverlaps += 1
+                                overlapsForKWIC[doc].append([gsKeyTup, engKeyTup, set(gsKeyTup).intersection(engKeyTup)])
                     if completeOverlaps > 0 or incompleteOverlaps > 0:
-                        #print str(gsKeyTup) + " : " + str(engKeyTup)
-                        #print str(gsDic[doc][gsKeyTup]) + " : " + str(engDic[doc][engKeyTup])
-                        #print("/////////////////////")
                         break
                 if incompleteOverlaps > 0 or completeOverlaps > 0:
                     break
@@ -545,51 +489,13 @@ for doc in docs:
                             finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
                     else:
                         finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
-##
-##print "incomplete overlaps"
-##for doc in docs:
-##    if not doc.endswith('.out.xml'):
-##        print "________________________________________________________"
-##        print doc
-##        print "\n\n TPs!"
-##        if doc in truePosFromOverlaps:
-##            print truePosFromOverlaps[doc]
-##        print "\n\n\nfinal incomplete overlaps"
-##        print finalIncompOverlaps[doc]
-                        
+
             #want to compbine the true positives and the overlap-derived true positives so as to retake statistics on these separately
             #this method below is wrong though -- need to put any additional overlaps in the same document.
             
             truePosWithOverlaps[doc] = {}
             truePosWithOverlaps[doc] = dict(truePosFromOverlaps[doc].items() + truePositives[doc].items())
         
-        #print "x%s mismatch instance(s) of proper scope but incorrect value involving entry number(s):\n" % len(scopeMatchValueMismatch)
-        #print scopeMatchValueMismatch
-        #print "\n"
-##        scopeMatchValueMismatchEntryNums = [entryNum for entryNum in scopeMatchValueMismatch]
-##        entryJustNumsList = []
-##        for entry in scopeMatchValueMismatchEntryNums:
-##            for subentry in entry:
-##                entryJustNumsList.append(subentry.split("_")[1])
-##
-        # Checking for scope mismatch, value match (Overlapping entry numbers, same code value)
-        #
-        # Test cases: "in October" vs "October" for DATE, "on October 21 1993" and "October 21 1993" as ABSOLUTE_DATE
-        # --> entry is in tuple but engine result tuple and gs tuple are different lengths
-##        engDiffsEntries = {}
-##        print "\n\nScope Mismatch - Value Match MIMs:"
-##        print "_____________________________________________\n"
-##        scopeMismatchValueMatch = []
-##        
-##        for i in range(len(gsWorkingData)):
-##            for j in range(len(engineDiffsList)):
-##                for k in range(len(engineDiffsList[j][0])):
-##                    if engineDiffsList[j][0][k] in gsWorkingData[i][0] and engineDiffsList[j] not in scopeMismatchValueMatch:
-##                        #want to be checking if scope are same / diff using the truePos list too
-##                        scopeMismatchValueMatch.append(engineDiffsList[j]);
-##        print "Scoping was problematic involving %s MIMs, which were:" % len(scopeMismatchValueMatch)
-##        print scopeMismatchValueMatch
-        # Totals
         finalData = {}
         # initialize final data with 0-counts
         for value in matrixValues:
@@ -604,7 +510,6 @@ for doc in docs:
                     if key in finalData and secondKey in finalData[key]:
                         finalData[key][secondKey] += confusionMatrix[doc][key][secondKey]
 
-
 # Final Report
 
 print 'Totals'
@@ -614,8 +519,6 @@ print 'False Positives: ' + str(falsePosCount)
 
 print 'Precision (TP/TP+FP): ' + str(float(truePosCount)/float(truePosCount+falsePosCount))
 print 'Recall (TP/TP+FN): ' + str(float(truePosCount)/float(truePosCount+falseNegCount))
-
-
 
 #
 # HTML Output
@@ -709,15 +612,15 @@ for column in values:
     comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
     if tp != 0:
         # fscore
-        print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
-        print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+        #print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
+        #print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
         fscore = TElement('td', text=str((2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))/((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))), attrib={'style':'background:#0962ac; color: #fff'})
-        print "fscore value: ", fscore.text
+        #print "fscore value: ", fscore.text
         comparisonData.append(fscore)
         # microrecall
         comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fn)))), attrib={'style':'background:#0962ac; color: #fff'})) # tp/tp+fn
         # microprecision
-        print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
+        #print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
         comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fp)))), attrib={'style':'background:#0962ac; color: #fff'})) #tp/tp+fp
     elif tp == 0:
         comparisonData.append(TElement('td', text="N/A"))
@@ -787,10 +690,6 @@ authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for question
 ##""", parent=body)
 #tooltips.attrib['type'] = "text/javascript"
 
-# KWIC examination text to go here in html
-
-# for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
-
 #write matrix table to file
 with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
     for i in range(len(root)):
@@ -798,6 +697,6 @@ with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
 outputFile.close()
 
 print '\nConfusion Matrix generated -- written to ' + path
-print 'Took', datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
+print 'Took', datetime.datetime.now()-startTime
 
-KWIC(errors)
+KWIC()
