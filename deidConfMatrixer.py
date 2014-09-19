@@ -9,7 +9,7 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.
 ## 2)	There is no link from confusion matrix to details files."
 ##
-import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections
+import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections, re, time
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
@@ -31,6 +31,7 @@ def findPair(fname):
 #truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
+
 
 def KWIC():
     """Creates readable xhtml output contexts """
@@ -58,12 +59,11 @@ def KWIC():
     head.extend(jquery)
 
     #Body
-    values = sorted([key for key in confusionMatrix.keys()])
     body = TElement('body', parent=html)
     h1 = TElement('h1', text="Error contexts:", parent=body)
     colorKey = TElement('p', text="Key:", parent=body)
-    fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:150px;'})
-    fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:150px;'})
+    fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
+    fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
 
     output = []
     
@@ -108,11 +108,11 @@ def KWIC():
                         #if entry not in gsDic[doc]:
                         #if getting an error, it's definitely from the engDic[doc]
                         if entry not in gsDic[doc].keys():
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                            outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
                         elif entry in gsDic[doc].keys():
-                            outputParagraph[i] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                            outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
                     elif entry in diffsDic[doc]['FN']:
-                        outputParagraph[i] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict['entry_' + str(i)] + '</error></strong></font>'
+                        outputParagraph[i] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
                 elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
                     #('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
                     #Multi-entry token handling:
@@ -120,12 +120,12 @@ def KWIC():
                             #Need to feed in a data structure that will for each entry do the color overlapping
                         for j in range(0, len(entry)):
                             if entry not in gsDic[doc].keys():
-                                outputParagraph[i+j] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                                outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                             elif entry in gsDic[doc].keys():
-                                outputParagraph[i+j] = '<font style="background-color:red"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                                outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                     elif entry in diffsDic[doc]['FN'].keys():
                         for j in range(0, len(entry)):
-                            outputParagraph[i+j] = '<font style="background-color:gold"><strong><error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '">' + wordDict[entry[j]] + '</error></strong></font>'
+                            outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                     i += len(entry)
 
         output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
@@ -156,16 +156,15 @@ def KWIC():
             outputFile.write(ET.tostring(root[i]))
     outputFile.close()
 
+    print "Now generating individual details files..."
+
     #want to do a findall for each combination of error and FN combinations greater than 0
-    print '\nDetails file(s) generated -- written to ' + path
-    print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
 
 
 class TElement(ET._Element):
     """Extending elementtree's Element class so as to accommodate text"""
     def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
         ET._Element.__init__(self, tag, dict(attrib, **extra))
-        
         if text:
             self.text = text
         if tail:
@@ -217,10 +216,13 @@ engDic = {}
 for doc in docs:
     if not doc.endswith('.out.xml'):
         docCount += 1
-        
-        print "\n\n_______________________________________\n"
+        #for x in xrange(0, len(docs)/2):
+        #percent = float(x) / (len(docs)/2)
+        #hashes = '#' * int(round(percent * 20))
+        #spaces = ' ' * (20 - len(hashes))
+        print "_______________________________________\n"
         print "Now running document %s out of %s..." % (docCount, len(docs)/2)
-        print "_______________________________________\n\n"
+        print "_______________________________________\n"
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngDoc = parse(findPair(path + '\\' + doc))
         
@@ -308,6 +310,8 @@ for doc in docs:
         diffsDic[doc] = {}
         diffsDic[doc]['FP'] = engDiffs
         diffsDic[doc]['FN'] = gsDiffs
+
+        errors[doc] = {}
         
         engDiffsOneToOne = {}
         for entry in engDiffs:
@@ -317,6 +321,9 @@ for doc in docs:
             else:
                 engDiffsOneToOne[entry] = engDiffs[entry]
 
+        errors[doc]["FP"] = {}
+        errors[doc]["FP"] = engDiffsOneToOne
+
         gsDiffsOneToOne = {}
         for entry in gsDiffs:
             if len(entry) > 1:
@@ -325,13 +332,8 @@ for doc in docs:
             else:
                 gsDiffsOneToOne[entry] = gsDiffs[entry]
 
-        # errors has the structure {doc:{"FN":{entry:code, ...}, "FP":{entry:code, ...} }
-        # -> being used by KWIC to provide error highlighting in contexts -- created the above 1:1 dics to facilitate that process for multi-token Mims
-        errors[doc] = {}
         errors[doc]["FN"] = {}
         errors[doc]["FN"] = gsDiffsOneToOne
-        errors[doc]["FP"] = {}
-        errors[doc]["FP"] = engDiffsOneToOne
 
         # Increments false positive count
         # Checks whether entries that exist in the engine exist in the gold standard
@@ -360,9 +362,9 @@ for doc in docs:
                 #if the entry numbers exist in both but the engineDic has a multi-code entry (meaning, overlapping MIMs)
                 if len(engDic[doc][entry]) > 1:
                     for code in engDic[doc][entry]:
-                        print "code that is in engDic[doc][entry]: ", code
+                        #print "code that is in engDic[doc][entry]: ", code
                         if code not in gsDic[doc][entry]:
-                            print "code that is not in gsDic[doc][entry]: ", code
+                            #print "code that is not in gsDic[doc][entry]: ", code
                             confusionMatrix[doc][gsDic[doc][entry]][(code,)] += 1
                 # Otherwise, entries exist in both but codes don't match (e.g, DATE =/= ABSOLUTE_DATE), increment false positive count
                 elif gsDic[doc][entry] != engDic[doc][entry]:
@@ -375,19 +377,13 @@ for doc in docs:
         for entry in gsDic[doc]:
             if entry not in engDic[doc]:
                 fnDic[gsDic[doc][entry]] += 1
-                print "initialized a false negative entry"
+                #print "initialized a false negative entry"
 
         ### gsDiffs = What the gold standard said was right ###
         ### engineDiffs = What the engine said was right ###
 
-        print "\n\nDifferences in engine versus gold standard - " + doc + ":"
-        print "_____________________________________________\n"
-        print "In gold standard version but not in engine version (false negatives): (x%s found)" % len(gsDiffs)
         falseNegCount += len(gsDiffs)
-        print ""
-        print "In engine version but not in gold standard version (false positives): (x%s found)" % len(engDiffs)
         falsePosCount += len(engDiffs)
-        print "\n\n"
         ### engineDiffs will contain false positives, scopeMismatchValueMatches, and ScopeMatchValueMismatch
         
         gsDiffsEntries = gsDiffs.keys()
@@ -404,8 +400,8 @@ for doc in docs:
 ##                strKey = str(key)
 ##                if strGDE == strKey:
                     #print("same")
+        
         # Checking for overlap
-        print "\nOverlap handling\n"
         overlapsForKWIC[doc] = []
         incompOverlaps[doc] = {}
         compOverlaps[doc] = {}
@@ -422,15 +418,10 @@ for doc in docs:
                             #if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]: #if codes are the same 
                             if str(gsKeyTup) == str(engKeyTup): 
                                 completeOverlaps += 1
-                                #print str(gsKeyTup)
-                                #print str(engKeyTup)
-                                print "Complete overlap occurs in " + str(gsKeyTup) + ", " + str(engKeyTup)
-                                print(str(engKeyTup[j]) + " " + str(engKeyTup))
                                 #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
                                 compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
                             else:
-                                print "Incomplete overlap occurs in" + str(gsKeyTup) + ", " + str(engKeyTup)
-                                print("Incomplete overlaps: " + str(engKeyTup[j]) + " " + str(engKeyTup))
+
                                 if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
                                     incompOverlaps[doc][gsKeyTup] = engKeyTup
                                 incompleteOverlaps += 1
@@ -439,23 +430,20 @@ for doc in docs:
                         break
                 if incompleteOverlaps > 0 or completeOverlaps > 0:
                     break
-        print "complete overlap count: " + str(completeOverlaps)
-        print "incomplete overlap count: " + str(incompleteOverlaps)
+        #print "complete overlap count: " + str(completeOverlaps)
+        #print "incomplete overlap count: " + str(incompleteOverlaps)
 
-        print "comparison of engine and gs entry tuples to sort out TP from FP overlaps based on criteria"
+        #comparison of engine and gs entry tuples to sort out TP from FP overlaps based on criteria
         if incompOverlaps[doc]:
             for gsTup, engTup in incompOverlaps[doc].items():
                 truePosFromOverlaps[doc] = {}
                 if len(gsTup) < len(engTup):
-                    print "length of engine tuple: ", len(engTup), " ", engTup, "  length of gs tuple (shorter): ", len(gsTup), " ", gsTup
+                    #print "length of engine tuple: ", len(engTup), " ", engTup, "  length of gs tuple (shorter): ", len(gsTup), " ", gsTup
                     testList = []
                     testList.append('entry_' + str(int(sorted(list(gsTup))[0].split("_")[1])-1))
-                    print "after append #1: ", testList
                     testList.extend(sorted(list(gsTup)))
-                    print "after append #2: ", testList
                     testList.append('entry_' + str(int(sorted(list(gsTup))[-1].split("_")[1])+1))
-                    print "after append #3: ", testList
-                    print "test list " + str(tuple(testList)) + " vs. engTup " + str(engTup)
+                    #print "test list " + str(tuple(testList)) + " vs. engTup " + str(engTup)
                     if len(gsTup)*1.0 / len(engTup) >= 3/4:
                         truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
                     elif len(tuple(testList))*1.0 / len(engTup) >= 2/3:
@@ -469,15 +457,12 @@ for doc in docs:
                         finalIncompOverlaps[doc][engTup] = engDic[doc][engTup]
                         
                 elif len(engTup) < len(gsTup):
-                    print "length of engine tuple (shorter): ", len(engTup), " ", engTup, "  length of gs tuple: ", len(gsTup), " ", gsTup
+                    #print "length of engine tuple (shorter): ", len(engTup), " ", engTup, "  length of gs tuple: ", len(gsTup), " ", gsTup
                     testList = []
                     testList.append('entry_' + str(int(sorted(list(engTup))[0].split("_")[1])-1))
-                    print "after append #1: ", testList
                     testList.extend(sorted(list(engTup)))
-                    print "after append #2: ", testList
                     testList.append('entry_' + str(int(sorted(list(engTup))[-1].split("_")[1])+1))
-                    print "after append #3: ", testList
-                    print "test list " + str(testList) + " vs. gsTup " + str(gsTup)
+                    #print "test list " + str(testList) + " vs. gsTup " + str(gsTup)
                     if len(engTup)*1.0 / len(gsTup) >= 3/4: #75% match condition
                         truePosFromOverlaps[doc][engTup] = engDic[doc][engTup]
                     elif len(tuple(testList))*1.0 / len(gsTup) >= 2/3: #this and next 'if' statement being the "plus or minus one token on either side" condition
@@ -495,6 +480,10 @@ for doc in docs:
             
             truePosWithOverlaps[doc] = {}
             truePosWithOverlaps[doc] = dict(truePosFromOverlaps[doc].items() + truePositives[doc].items())
+
+            #sys.stdout.write("\rPercent: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+            #sys.stdout.flush()
+            
         
         finalData = {}
         # initialize final data with 0-counts
@@ -512,7 +501,7 @@ for doc in docs:
 
 # Final Report
 
-print 'Totals'
+print '\nTotals'
 print 'True Positives: ' + str(truePosCount)
 print 'False Negatives: ' + str(falseNegCount)
 print 'False Positives: ' + str(falsePosCount)
@@ -593,17 +582,23 @@ for column in values:
     rowHeader = TElement('th', text=column[0], parent=dataRow)
     blankData = TElement('td', parent=dataRow)
     blankData.attrib['style'] = "border:0px"
+    blankData.attrib['class'] = "BLANK"
+    comparisonData = []
+    comparisonData.append(blankData)
     fn = fnDic[column]
-    comparisonData = [TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values]
+    comparisonData.extend([TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values])
     #print "fn ", fn, " for row ", row
     for tdElement in comparisonData:
-        tdElement.attrib['row'] = column[0]
+        tdElement.attrib['row'] = column[0] #[0] for getting the string inside the tuples :p
         if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
             tp = int(tdElement.text)
             tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
-        elif not 'style' in tdElement.attrib and tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] :
+        elif tdElement.text != '0' and tdElement.attrib['class'] != "BLANK" and tdElement.attrib['column'] != tdElement.attrib['row']:
             fp += int(tdElement.text)
             tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
+            if tdElement.attrib['style'] == "background: #ed6e00; border: 1px solid #404040":
+                tdElement.append(TElement('a', text=tdElement.text, attrib={'href':str(tdElement.attrib['column'])+"x"+str(tdElement.attrib['row'])+".xhtml"}))
+            tdElement.text=None
         elif not 'style' in tdElement.attrib:
             tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
         dataRow.extend(tdElement)
@@ -644,7 +639,6 @@ for i in range(len(listMatrix)):
     for j in range(len(listMatrix[i])):
         td += listMatrix[j][i]
     TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#0962ac; color: #fff'})
-
 
 emptySpacing = TElement('p', parent=body)
 
@@ -699,4 +693,62 @@ outputFile.close()
 print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime
 
+values = sorted([key for key in finalData.keys()])
+
 KWIC()
+
+kwicParsed = minidom.parse(path + '\\' + "KWIC_out.xhtml")
+
+for column in values:
+    for row in values:
+        detailsOutput = []
+
+        if finalData[column][row] > 0 and column != row:
+            print column
+            print row
+            print finalData[column][row]
+        
+            rootTemp = TElement('html')
+            html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
+
+            #Header
+            head = TElement('head', parent=rootTemp)
+            title = TElement('title', text=(re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row)) + " results"), parent=head)
+            #text=re.search('([A-Z]+_)+[A-Z]+', str(column)) + "x" + re.search('([A-Z]+_)+[A-Z]+', str(row)) + " results"
+            css = TElement('link', parent=head)
+            
+            css.attrib['href'] = "css.css"
+            css.attrib['type'] = "text/css"
+            css.attrib['rel'] = "stylesheet"
+
+            jquery = TElement('script', text="//", parent=head)
+            jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+
+            head.extend(css)
+            head.extend(title)
+            head.extend(jquery)
+
+            body = TElement('body', parent=rootTemp)
+            h1 = TElement('h1', text=(re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row))), parent=body)
+            colorKey = TElement('p', text="Key:", parent=body)
+            fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
+            fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
+            contextsTable = TElement('table', parent=body)
+
+            targetContexts = kwicParsed.getElementsByTagName('context')
+            for context in targetContexts:
+                errors = context.childNodes
+                for error in errors:
+                    if error.nodeValue is not None:
+                        if error.attributes['gs'].value == str(column) and error.attributes['eng'].value == str(row):
+                            contextsTable.append(TElement('h3', text=context.get('doc')))
+                            contextsTable.append(context)
+                            contextsTable.append(TElement('p', parent=contextsTable))
+            
+                with open(os.path.join(path, re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row)) + ".xhtml"), 'w') as detailsOutput:
+                    for i in range(len(rootTemp)):
+                        detailsOutput.write(ET.tostring(rootTemp[i]))
+                outputFile.close()
+
+print '\nDetails file(s) generated -- written to ' + path
+print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
