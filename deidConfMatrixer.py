@@ -594,14 +594,16 @@ for column in values:
         elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] and not tdElement.text == None:
             fp += int(tdElement.text)
             tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
-            tdElement.append(TElement('a', text=tdElement.text, attrib={'href':str(tdElement.attrib['row'])+"x"+str(tdElement.attrib['column'])+".xhtml"}))
+            tdElement.append(TElement('a', text=tdElement.text, attrib={'href':str(tdElement.attrib['row'])+"x"+str(tdElement.attrib['column'])+'.xhtml', 'style':'font-weight:bold; color:#fff;'}))
             tdElement.text = None
         elif not 'style' in tdElement.attrib:
             tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
         #dataRow.extend(tdElement)
     print ET.tostring(dataRow)
     # print "out of loop, tabulated fp: " + str(fp)
-    comparisonData.append(TElement('td', text=str(fnDic[column]), attrib={'style':'background:#0962ac; color:#fff'}))
+    falseNegLinkage = TElement('td', attrib={'style':'background:#0962ac; color:#fff'})
+    falseNegLinkage.append(TElement('a', text=str(fnDic[column]), attrib={'href':str(column[0])+'.xhtml', 'style':'font-weight:bold; color:#fff;'}))
+    comparisonData.append(falseNegLinkage)
     comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
     if tp != 0:
         # fscore
@@ -629,14 +631,14 @@ for column in values:
         listMatrix.append([finalData[column][row] for row in values])
 
 #Generating tds for tabulations of columns        
-engSumsTr = TElement('tr', parent=table)
-engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#0962ac;'})
-engSumsBlankTd = TElement('td', parent=engSumsTr)
-for i in range(len(listMatrix)):
-    td = 0
-    for j in range(len(listMatrix[i])):
-        td += listMatrix[j][i]
-    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#0962ac; color: #fff'})
+##engSumsTr = TElement('tr', parent=table)
+##engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#0962ac;'})
+##engSumsBlankTd = TElement('td', parent=engSumsTr)
+##for i in range(len(listMatrix)):
+##    td = 0
+##    for j in range(len(listMatrix[i])):
+##        td += listMatrix[j][i]
+##    TElement('td', text=str(td), parent=engSumsTr, attrib={'style':'background:#0962ac; color: #fff'})
 
 emptySpacing = TElement('p', parent=body)
 
