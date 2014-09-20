@@ -220,9 +220,8 @@ for doc in docs:
         #percent = float(x) / (len(docs)/2)
         #hashes = '#' * int(round(percent * 20))
         #spaces = ' ' * (20 - len(hashes))
-        print "_______________________________________\n"
-        print "Now running document %s out of %s..." % (docCount, len(docs)/2)
-        print "_______________________________________\n"
+        sys.stdout.write("\r_______________________________________\n\nNow running document %s out of %s...\n_______________________________________\n" % (docCount, len(docs)/2))
+        sys.stdout.flush()
         parsedGSDoc = parse(path + '\\' + doc)
         parsedEngDoc = parse(findPair(path + '\\' + doc))
         
@@ -584,7 +583,6 @@ for column in values:
     blankData.attrib['style'] = "border:0px"
     blankData.attrib['class'] = "BLANK"
     comparisonData = []
-    comparisonData.append(blankData)
     fn = fnDic[column]
     comparisonData.extend([TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values])
     #print "fn ", fn, " for row ", row
@@ -593,15 +591,15 @@ for column in values:
         if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
             tp = int(tdElement.text)
             tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040"
-        elif tdElement.text != '0' and tdElement.attrib['class'] != "BLANK" and tdElement.attrib['column'] != tdElement.attrib['row']:
+        elif tdElement.text != '0' and tdElement.attrib['column'] != tdElement.attrib['row'] and not tdElement.text == None:
             fp += int(tdElement.text)
             tdElement.attrib['style'] = "background: #ed6e00; border: 1px solid #404040"
-            if tdElement.attrib['style'] == "background: #ed6e00; border: 1px solid #404040":
-                tdElement.append(TElement('a', text=tdElement.text, attrib={'href':str(tdElement.attrib['column'])+"x"+str(tdElement.attrib['row'])+".xhtml"}))
-            tdElement.text=None
+            tdElement.append(TElement('a', text=tdElement.text, attrib={'href':str(tdElement.attrib['row'])+"x"+str(tdElement.attrib['column'])+".xhtml"}))
+            tdElement.text = None
         elif not 'style' in tdElement.attrib:
             tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
-        dataRow.extend(tdElement)
+        #dataRow.extend(tdElement)
+    print ET.tostring(dataRow)
     # print "out of loop, tabulated fp: " + str(fp)
     comparisonData.append(TElement('td', text=str(fnDic[column]), attrib={'style':'background:#0962ac; color:#fff'}))
     comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
