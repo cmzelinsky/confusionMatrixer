@@ -599,7 +599,6 @@ for column in values:
         elif not 'style' in tdElement.attrib:
             tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
         #dataRow.extend(tdElement)
-    print ET.tostring(dataRow)
     # print "out of loop, tabulated fp: " + str(fp)
     falseNegLinkage = TElement('td', attrib={'style':'background:#0962ac; color:#fff'})
     falseNegLinkage.append(TElement('a', text=str(fnDic[column]), attrib={'href':str(column[0])+'.xhtml', 'style':'font-weight:bold; color:#fff;'}))
@@ -692,6 +691,7 @@ outputFile.close()
 
 print '\nConfusion Matrix generated -- written to ' + path
 print 'Took', datetime.datetime.now()-startTime
+print '\n\nStarting details file processing...'
 
 values = sorted([key for key in finalData.keys()])
 
@@ -701,19 +701,13 @@ kwicParsed = minidom.parse(path + '\\' + "KWIC_out.xhtml")
 
 for column in values:
     for row in values:
-        detailsOutput = []
-
+        dump = []
         if finalData[column][row] > 0 and column != row:
-            print column
-            print row
-            print finalData[column][row]
-        
             rootTemp = TElement('html')
-            html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
-
+            rootTemp.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
             #Header
             head = TElement('head', parent=rootTemp)
-            title = TElement('title', text=(re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row)) + " results"), parent=head)
+            title = TElement('title', text=(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)) + " results"), parent=head)
             #text=re.search('([A-Z]+_)+[A-Z]+', str(column)) + "x" + re.search('([A-Z]+_)+[A-Z]+', str(row)) + " results"
             css = TElement('link', parent=head)
             
@@ -727,28 +721,54 @@ for column in values:
             head.extend(css)
             head.extend(title)
             head.extend(jquery)
-
+            
+            rootTemp.extend(head)
+            
+            #Body
             body = TElement('body', parent=rootTemp)
-            h1 = TElement('h1', text=(re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row))), parent=body)
+            h1 = TElement('h1', text=(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row))), parent=body)
             colorKey = TElement('p', text="Key:", parent=body)
             fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
             fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
-            contextsTable = TElement('table', parent=body)
+            contextsTable = TElement('table') 
 
             targetContexts = kwicParsed.getElementsByTagName('context')
             for context in targetContexts:
-                errors = context.childNodes
+                errorAndTextChildren = context.childNodes
+                #Gets us the immediate text nodes and the error nodes
+                errors = errorAndTextChildren.getElementsByTagName('error')
+                #Having a nodelist issue
                 for error in errors:
-                    if error.nodeValue is not None:
-                        if error.attributes['gs'].value == str(column) and error.attributes['eng'].value == str(row):
-                            contextsTable.append(TElement('h3', text=context.get('doc')))
-                            contextsTable.append(context)
-                            contextsTable.append(TElement('p', parent=contextsTable))
-            
-                with open(os.path.join(path, re.sub('[(),\']', '', str(column)) + "x" + re.sub('[(),\']', '', str(row)) + ".xhtml"), 'w') as detailsOutput:
-                    for i in range(len(rootTemp)):
-                        detailsOutput.write(ET.tostring(rootTemp[i]))
-                outputFile.close()
+                    print "node type: ", error.nodeType
+                    if error.getAttribute('gs') and error.getAttribute('eng'):
+                        # then we have a false positive error!
+                        if error.getAttribute('gs') == str(column) and error.getAttribute('eng') == str(row):
+                            print "yeah, something went through"
+                            dump.append('<h3>' + context.getAttribute('doc') + '</h3>')
+                            dump.append(ET.tostring(context))
+                            dump.append('<p/>')
+                            print "yeah stuff got appended"
+                            body.extend(contextsTable)
+                            rootTemp.extend(body)
+                            print ET.tostring(rootTemp)
+                            with open(os.path.join(path, re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"), 'w') as detailsOutput:
+                                for i in range(len(rootTemp)):
+                                    detailsOutput.write(ET.tostring(rootTemp[i]))
+                                outputFile.close()
+                        # else this is a false negative
+                        elif error.getAttribute('gs') and not error.getAttribute('eng') and error.getAttribute('gs') == str(column):
+                            print "yeah something went through"
+                            dump.append('<h3>' + context.getAttribute('doc') + '</h3>')
+                            dump.append(ET.tostring(context))
+                            dump.append('<p/>')
+                            print "yup stuff got appended"
+                            body.extend(dump)
+                            rootTemp.extend(body)
+                            print ET.tostring(rootTemp)
+                            with open(os.path.join(path, re.sub('[(),u\']', '', str(column)) + ".xhtml"), 'w') as detailsOutput:
+                                for i in range(len(rootTemp)):
+                                    detailsOutput.write(ET.tostring(rootTemp[i]))
+                                outputFile.close()
 
 print '\nDetails file(s) generated -- written to ' + path
 print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
