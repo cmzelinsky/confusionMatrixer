@@ -9,7 +9,7 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.
 ## 2)	There is no link from confusion matrix to details files."
 ##
-import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, libxml2, collections, re, time
+import datetime, os, xml.dom.minidom, datetime, operator, pickle, sys, re, time
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree
@@ -31,135 +31,6 @@ def findPair(fname):
 #truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
-
-
-def KWIC():
-    """Creates readable xhtml output contexts """
-    
-    parser = etree.XMLParser(encoding="utf-8", recover=True)
-
-    root = TElement('root')
-    html = TElement('html', parent=root)
-    html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
-
-    #Header
-    head = TElement('head', parent=html)
-    title = TElement('title', text="Deid Stats Results", parent=head)
-    css = TElement('link', parent=head)
-    
-    css.attrib['href'] = "css.css"
-    css.attrib['type'] = "text/css"
-    css.attrib['rel'] = "stylesheet"
-
-    jquery = TElement('script', text="//", parent=head)
-    jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
-
-    head.extend(css)
-    head.extend(title)
-    head.extend(jquery)
-
-    #Body
-    body = TElement('body', parent=html)
-    h1 = TElement('h1', text="Error contexts:", parent=body)
-    colorKey = TElement('p', text="Key:", parent=body)
-    fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
-    fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
-
-    output = []
-    
-    for doc in diffsDic:
-        parsedGsDoc = minidom.parse(path + '\\' + doc)
-        parsedEngDoc = minidom.parse(findPair(path + '\\' + doc))
-        paragraphs = []
-        outputParagraph = []
-        wordDict = {}
-        contents = parsedEngDoc.getElementsByTagName('content')
-        gsContents = parsedGsDoc.getElementsByTagName('content')
-        #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
-        entryTuples = [FPtuples for FPtuples in diffsDic[doc]['FP']]
-        entryTuples.extend([FNtuples for FNtuples in diffsDic[doc]['FN']])
-        for entry in entryTuples:
-            if type(entry) != tuple:
-                entryTuples.insert(entryTuples.index(entry),(entry,))
-                entryTuples.remove(entry)
-        #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
-                
-        for content in contents:
-            for char in ['&', ';', '<', '>']:
-                if content.firstChild is not None:
-                    if char in content.firstChild.nodeValue:
-                        wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue.replace(char, "")
-                    else:
-                        wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
-
-        for i in range(len(wordDict)):
-            if 'entry_' + str(i) in wordDict:
-                outputParagraph.append(wordDict['entry_' + str(i)])
-
-        #Compare the errors (entryTuples) to the indexes in the outputParagraph to see which indexes need to be overwritten
-        for entry in entryTuples:
-            i = 0
-            for i in range(len(wordDict)):
-                #Single token entry handling:
-                if ('entry_' + str(i),) == entry and len(entry) == 1:
-                    #Something in the error list occurs at index i -- need to overwrite for this i and for this entry num
-                    if entry in diffsDic[doc]['FP']:
-                        #had added this next line to control flow to list / dic indexes because of an error when assigning @eng and @gs
-                        #if entry not in gsDic[doc]:
-                        #if getting an error, it's definitely from the engDic[doc]
-                        if entry not in gsDic[doc].keys():
-                            outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
-                        elif entry in gsDic[doc].keys():
-                            outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
-                    elif entry in diffsDic[doc]['FN']:
-                        outputParagraph[i] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
-                elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
-                    #('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
-                    #Multi-entry token handling:
-                    if entry in diffsDic[doc]['FP'].keys():
-                            #Need to feed in a data structure that will for each entry do the color overlapping
-                        for j in range(0, len(entry)):
-                            if entry not in gsDic[doc].keys():
-                                outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                            elif entry in gsDic[doc].keys():
-                                outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                    elif entry in diffsDic[doc]['FN'].keys():
-                        for j in range(0, len(entry)):
-                            outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                    i += len(entry)
-
-        output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
-
-    output = "<contexts>" + "".join(output) + "</contexts>"
-
-    allContexts = path + "allContexts.xhtml"
-    with open(os.path.join(path, allContexts), 'w') as allContextsXML:
-        allContextsXML.write(output)
-    allContextsXML.close()
-
-    #reparsing the output so as to proceed to add it to a final xhtml format:
-    finalOutput = ET.parse(allContexts, parser=parser)
-
-    allContextsPerDoc = finalOutput.findall('context')
-        
-    allContextsTable = TElement('table', parent=body)
-    allContextsTable.attrib['id'] = "KWIC"
-
-    for context in allContextsPerDoc:
-        allContextsTable.append(TElement('h3', text=context.get('doc')))
-        allContextsTable.append(context)
-        allContextsTable.append(TElement('p', parent=allContextsTable))
-
-    # for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
-    with open(os.path.join(path, "KWIC_out.xhtml"), 'w') as outputFile:
-        for i in range(len(root)):
-            outputFile.write(ET.tostring(root[i]))
-    outputFile.close()
-
-    print "Now generating individual details files..."
-
-    #want to do a findall for each combination of error and FN combinations greater than 0
-
 
 class TElement(ET._Element):
     """Extending elementtree's Element class so as to accommodate text"""
@@ -420,7 +291,6 @@ for doc in docs:
                                 #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
                                 compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
                             else:
-
                                 if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
                                     incompOverlaps[doc][gsKeyTup] = engKeyTup
                                 incompleteOverlaps += 1
@@ -695,80 +565,399 @@ print '\n\nStarting details file processing...'
 
 values = sorted([key for key in finalData.keys()])
 
-KWIC()
+"""Creates readable xhtml output contexts """
+
+parser = etree.XMLParser(encoding="utf-8", recover=True)
+
+root = TElement('root')
+html = TElement('html', parent=root)
+html.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
+
+#Header
+head = TElement('head', parent=html)
+title = TElement('title', text="Deid Stats Results", parent=head)
+css = TElement('link', parent=head)
+
+css.attrib['href'] = "css.css"
+css.attrib['type'] = "text/css"
+css.attrib['rel'] = "stylesheet"
+
+jquery = TElement('script', text="//", parent=head)
+jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
+
+head.extend(css)
+head.extend(title)
+head.extend(jquery)
+
+#Body
+body = TElement('body', parent=html)
+h1 = TElement('h1', text="Error contexts:", parent=body)
+colorKey = TElement('p', text="Key:", parent=body)
+fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
+fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
+
+output = []
+contexts = {}
+
+for doc in diffsDic:
+    parsedGsDoc = minidom.parse(path + '\\' + doc)
+    parsedEngDoc = minidom.parse(findPair(path + '\\' + doc))
+    paragraphs = []
+    outputParagraph = []
+    wordDict = {}
+    contents = parsedEngDoc.getElementsByTagName('content')
+    gsContents = parsedGsDoc.getElementsByTagName('content')
+    #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
+    entryTuples = [FPtuples for FPtuples in diffsDic[doc]['FP']]
+    entryTuples.extend([FNtuples for FNtuples in diffsDic[doc]['FN']])
+    for entry in entryTuples:
+        if type(entry) != tuple:
+            entryTuples.insert(entryTuples.index(entry),(entry,))
+            entryTuples.remove(entry)
+    #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
+            
+    for content in contents:
+        for char in ['&', ';', '<', '>']:
+            if content.firstChild is not None:
+                if char in content.firstChild.nodeValue:
+                    wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue.replace(char, "")
+                else:
+                    wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
+
+    for i in range(len(wordDict)):
+        if 'entry_' + str(i) in wordDict:
+            outputParagraph.append(wordDict['entry_' + str(i)])
+
+    #Compare the errors (entryTuples) to the indexes in the outputParagraph to see which indexes need to be overwritten
+    for entry in entryTuples:
+        i = 0
+        for i in range(len(wordDict)):
+            #Single token entry handling:
+            if ('entry_' + str(i),) == entry and len(entry) == 1:
+                #Something in the error list occurs at index i -- need to overwrite for this i and for this entry num
+
+                if entry in diffsDic[doc]['FP']:
+                    #had added this next line to control flow to list / dic indexes because of an error when assigning @eng and @gs
+                    #if entry not in gsDic[doc]:
+                    #if getting an error, it's definitely from the engDic[doc]
+
+                    
+                    if entry not in gsDic[doc].keys():
+                        if str(engDic[doc][entry])+"ONLY" not in contexts:
+                            contexts[str(engDic[doc][entry])+"ONLY"] = {}
+                        #LAST_NAME "He"-type spontaneous FPs
+                        outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                        temp = []
+                        for k in range(i-10, i+10):
+                            if k >= 0 and not k > len(wordDict)-1:
+                                if k == i:
+                                    temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                else:
+                                    temp.append(wordDict['entry_' + str(k)])
+                        if doc not in contexts:
+                            contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
+                        contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
+
+                        
+                    elif entry in gsDic[doc].keys():
+                        #FP mismatch
+                        if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
+                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
+                        outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                        temp = []
+                        for k in range(i-10, i+10):
+                            if k >= 0 and not k > len(wordDict)-1:
+                                if k == i:
+                                    temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                else:
+                                    temp.append(wordDict['entry_' + str(k)])
+                        if doc not in contexts:
+                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
+                        contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
+
+                        
+                elif entry in diffsDic[doc]['FN']:
+                    if str(gsDic[doc][entry]) not in contexts:
+                        contexts[str(gsDic[doc][entry])] = {}
+                    outputParagraph[i] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                    temp = []
+                    for k in range(i-10, i+10):
+                        if k >= 0 and not k > len(wordDict)-1: 
+                            if k == i:
+                                temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                            else:
+                                temp.append(wordDict['entry_' + str(k)])
+                    if doc not in contexts:
+                        contexts[str(gsDic[doc][entry])][doc] = []
+                    contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
+                    
+                    
+            elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
+                # MULTI-ENTRY HANDLING e.g. ('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
+                if entry in diffsDic[doc]['FP'].keys():
+                    for j in range(0, len(entry)):
+
+                        #if entry is a non-mismatch (spontaneous) multi-entry fp
+                        if entry not in gsDic[doc].keys():
+                            if str(engDic[doc][entry])+"ONLY" not in contexts:
+                                contexts[str(engDic[doc][entry])+"ONLY"] = {}
+                            #contexts[str(column)+str(row)] = []
+                            outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                            temp = []
+                            for k in range(i-10, i+10):
+                                if k >= 0 and not k > len(wordDict)-1: 
+                                    if k == i:
+                                        temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                    else:
+                                        temp.append(wordDict['entry_' + str(k)])
+                            if doc not in contexts:
+                                contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
+                            contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
+
+                        # If entry is a mismatch multi-entry fp
+                        elif entry in gsDic[doc].keys():
+                            if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
+                            outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                            temp = []
+                            for k in range(i+j-10, i+j+10):
+                                if k >= 0 and not k > len(wordDict)-1: 
+                                    if k == i+j:
+                                        temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                    else:
+                                        temp.append(wordDict['entry_' + str(k)])
+                            if doc not in contexts:
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
+                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
+
+                # If entry is a multi-entry fn
+                elif entry in diffsDic[doc]['FN'].keys():
+                    print entry
+                    print engDic[doc]
+                    if str(diffsDic[doc]['FN'][entry]) not in contexts:
+                        contexts[str(diffsDic[doc]['FN'][entry])] = {}
+                    for j in range(0, len(entry)):
+                        #contexts[str(row)] = []
+                        outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                        temp = []
+                        for k in range(i+j-10, i+j+10):
+                            if k >= 0 and not k > len(wordDict)-1: 
+                                if k == i+j:
+                                    temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                else:
+                                    temp.append(wordDict['entry_' + str(k)])
+                        if doc not in contexts:
+                            contexts[str(gsDic[doc][entry])][doc] = []
+                        contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
+                        print "MULTI FN ENTRY GENERATED IN CONFUSION ", str(gsDic[doc][entry])
+                i += len(entry)
+
+    output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
+
+output = "<contexts>" + "".join(output) + "</contexts>"
+
+allContexts = path + "allContexts.xhtml"
+with open(os.path.join(path, allContexts), 'w') as allContextsXML:
+    allContextsXML.write(output)
+allContextsXML.close()
+
+#reparsing the output so as to proceed to add it to a final xhtml format:
+finalOutput = ET.parse(allContexts, parser=parser)
+
+allContextsPerDoc = finalOutput.findall('context')
+    
+allContextsTable = TElement('table', parent=body)
+allContextsTable.attrib['id'] = "KWIC"
+
+for context in allContextsPerDoc:
+    allContextsTable.append(TElement('h3', text=context.get('doc')))
+    allContextsTable.append(context)
+    allContextsTable.append(TElement('p', parent=allContextsTable))
+
+# for the file it's hashed to, if some entry numbers appeared in false positives or false negatives, get all text descendents from paragraph nodes 
+with open(os.path.join(path, "KWIC_out.xhtml"), 'w') as outputFile:
+    for i in range(len(root)):
+        outputFile.write(ET.tostring(root[i]))
+outputFile.close()
+
+print "Now generating individual details files..."
+
+#want to do a findall for each combination of error and FN combinations greater than 0
 
 kwicParsed = minidom.parse(path + '\\' + "KWIC_out.xhtml")
 
+#FN File Handling
+for column in values:
+    if fnDic[column] > 0:
+    #for row in values:
+        #if finalData[column][row] > 0 and column != row:
+        #if the stat is non-zero and not a true positive
+        print "column: ", column
+        Doc = minidom.Document()
+        rootTemp = Doc.createElement('html')
+        rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+        
+        #Header
+        head = Doc.createElement('head')
+        rootTemp.appendChild(head)
+        
+        title = Doc.createElement('title')
+        titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
+        title.appendChild(titleText)
+        head.appendChild(title)
+        
+        css = Doc.createElement('link')
+        css.setAttribute('href', 'css.css')
+        css.setAttribute('type', 'text/css')
+        css.setAttribute('rel', 'stylesheet')
+        head.appendChild(css)
+
+        jquery = Doc.createElement('script')
+        jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
+        jqueryText = Doc.createTextNode('//')
+        jquery.appendChild(jqueryText)
+        head.appendChild(jquery)
+        
+        rootTemp.appendChild(head)
+        
+        #Body
+        body = Doc.createElement('body')
+        h1 = Doc.createElement('h1')
+        h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)))
+        h1.appendChild(h1Text)
+        
+        colorKey = Doc.createElement('p')
+        colorKeyText = Doc.createTextNode('Key:')
+        colorKey.appendChild(colorKeyText)
+
+        fpKey = Doc.createElement('p')
+        fpKeyText = Doc.createTextNode('False Positive')
+        fpKey.appendChild(fpKeyText)
+        fpKey.setAttribute('style', 'background:red; width:120px;')
+        colorKey.appendChild(fpKey)
+        
+        fnKey = Doc.createElement('p')
+        fnKeyText = Doc.createTextNode('False Negative')
+        fnKey.appendChild(fnKeyText)
+        fnKey.setAttribute('style', 'background:gold; width:120px;')
+        colorKey.appendChild(fnKey)
+
+        body.appendChild(h1)
+        body.appendChild(colorKey)
+
+        contextsTable = Doc.createElement('table')
+        
+        for docName, snippets in contexts[str(column)].items():
+            contextNode = Doc.createElement('ul')
+            docNode = Doc.createElement('h3')
+            docText = Doc.createTextNode(docName)
+            docNode.appendChild(docText)
+            contextNode.appendChild(docNode)
+            for snippet in snippets:
+                snippet = "<p>" + re.sub('&', 'and', snippet.encode('ascii', 'replace')) + "</p>"
+                print snippet
+                parsedSnippet = minidom.parseString(snippet).firstChild
+                contextNode.appendChild(parsedSnippet)
+            print contextNode.toxml(), " getting appended to contextsTable"
+            contextsTable.appendChild(contextNode)
+
+        body.appendChild(contextsTable)
+        rootTemp.appendChild(body)
+        Doc.appendChild(rootTemp)
+        f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
+        #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+        with open(os.path.join(path, f), 'w') as output:
+            output.write(Doc.toxml())
+        output.close()
+
+
+#FP File Handling
 for column in values:
     for row in values:
-        dump = []
         if finalData[column][row] > 0 and column != row:
-            rootTemp = TElement('html')
-            rootTemp.attrib['xmlns'] = "http://www.w3.org/1999/xhtml"
+        #if the stat is non-zero and not a true positive               
+            print "column: ", column, " row: ", row
+            Doc = minidom.Document()
+            rootTemp = Doc.createElement('html')
+            rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+            
             #Header
-            head = TElement('head', parent=rootTemp)
-            title = TElement('title', text=(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)) + " results"), parent=head)
-            #text=re.search('([A-Z]+_)+[A-Z]+', str(column)) + "x" + re.search('([A-Z]+_)+[A-Z]+', str(row)) + " results"
-            css = TElement('link', parent=head)
+            head = Doc.createElement('head')
+            rootTemp.appendChild(head)
             
-            css.attrib['href'] = "css.css"
-            css.attrib['type'] = "text/css"
-            css.attrib['rel'] = "stylesheet"
-
-            jquery = TElement('script', text="//", parent=head)
-            jquery.attrib['src'] = "http://code.jquery.com/jquery-1.10.2.js"
-
-            head.extend(css)
-            head.extend(title)
-            head.extend(jquery)
+            title = Doc.createElement('title')
+            titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
+            title.appendChild(titleText)
+            head.appendChild(title)
             
-            rootTemp.extend(head)
+            css = Doc.createElement('link')
+            css.setAttribute('href', 'css.css')
+            css.setAttribute('type', 'text/css')
+            css.setAttribute('rel', 'stylesheet')
+            head.appendChild(css)
+
+            jquery = Doc.createElement('script')
+            jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
+            jqueryText = Doc.createTextNode('//')
+            jquery.appendChild(jqueryText)
+            head.appendChild(jquery)
+            
+            rootTemp.appendChild(head)
             
             #Body
-            body = TElement('body', parent=rootTemp)
-            h1 = TElement('h1', text=(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row))), parent=body)
-            colorKey = TElement('p', text="Key:", parent=body)
-            fpKey = TElement('p', text="False Positive", parent=colorKey, attrib={'style':'background:red; width:120px;'})
-            fnKey = TElement('p', text="False Negative", parent=colorKey, attrib={'style':'background:gold; width:120px;'})
-            contextsTable = TElement('table') 
+            body = Doc.createElement('body')
+            h1 = Doc.createElement('h1')
+            h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)))
+            h1.appendChild(h1Text)
+            
+            colorKey = Doc.createElement('p')
+            colorKeyText = Doc.createTextNode('Key:')
+            colorKey.appendChild(colorKeyText)
 
-            targetContexts = kwicParsed.getElementsByTagName('context')
-            for context in targetContexts:
-                errorAndTextChildren = context.childNodes
-                #Gets us the immediate text nodes and the error nodes
-                errors = errorAndTextChildren.getElementsByTagName('error')
-                #Having a nodelist issue
-                for error in errors:
-                    print "node type: ", error.nodeType
-                    if error.getAttribute('gs') and error.getAttribute('eng'):
-                        # then we have a false positive error!
-                        if error.getAttribute('gs') == str(column) and error.getAttribute('eng') == str(row):
-                            print "yeah, something went through"
-                            dump.append('<h3>' + context.getAttribute('doc') + '</h3>')
-                            dump.append(ET.tostring(context))
-                            dump.append('<p/>')
-                            print "yeah stuff got appended"
-                            body.extend(contextsTable)
-                            rootTemp.extend(body)
-                            print ET.tostring(rootTemp)
-                            with open(os.path.join(path, re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"), 'w') as detailsOutput:
-                                for i in range(len(rootTemp)):
-                                    detailsOutput.write(ET.tostring(rootTemp[i]))
-                                outputFile.close()
-                        # else this is a false negative
-                        elif error.getAttribute('gs') and not error.getAttribute('eng') and error.getAttribute('gs') == str(column):
-                            print "yeah something went through"
-                            dump.append('<h3>' + context.getAttribute('doc') + '</h3>')
-                            dump.append(ET.tostring(context))
-                            dump.append('<p/>')
-                            print "yup stuff got appended"
-                            body.extend(dump)
-                            rootTemp.extend(body)
-                            print ET.tostring(rootTemp)
-                            with open(os.path.join(path, re.sub('[(),u\']', '', str(column)) + ".xhtml"), 'w') as detailsOutput:
-                                for i in range(len(rootTemp)):
-                                    detailsOutput.write(ET.tostring(rootTemp[i]))
-                                outputFile.close()
+            fpKey = Doc.createElement('p')
+            fpKeyText = Doc.createTextNode('False Positive')
+            fpKey.appendChild(fpKeyText)
+            fpKey.setAttribute('style', 'background:red; width:120px;')
+            colorKey.appendChild(fpKey)
+            
+            fnKey = Doc.createElement('p')
+            fnKeyText = Doc.createTextNode('False Negative')
+            fnKey.appendChild(fnKeyText)
+            fnKey.setAttribute('style', 'background:gold; width:120px;')
+            colorKey.appendChild(fnKey)
 
+            body.appendChild(h1)
+            body.appendChild(colorKey)
+
+            contextsTable = Doc.createElement('table')
+
+            def appendKWIC():
+                contextNode = Doc.createElement('ul')
+                docNode = Doc.createElement('h3')
+                docText = Doc.createTextNode(docName)
+                docNode.appendChild(docText)
+                contextNode.appendChild(docNode)
+                for snippet in snippets:
+                    snippet = "<p>" + re.sub('&', 'and', snippet.encode('ascii', 'replace')) + "</p>"
+                    print snippet
+                    parsedSnippet = minidom.parseString(snippet).firstChild
+                    contextNode.appendChild(parsedSnippet)
+                print contextNode.toxml(), " getting appended to contextsTable"
+                contextsTable.appendChild(contextNode)
+            
+            for docName, snippets in contexts[str(column)+str(row)].items():
+                appendKWIC()
+            for docName, snippets in contexts[str(column)+"ONLY"].items():
+                appendKWIC()
+
+            body.appendChild(contextsTable)
+            rootTemp.appendChild(body)
+            Doc.appendChild(rootTemp)
+            f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
+            #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+            with open(os.path.join(path, f), 'w') as output:
+                output.write(Doc.toxml())
+            output.close()
+            
 print '\nDetails file(s) generated -- written to ' + path
 print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
