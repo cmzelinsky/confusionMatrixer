@@ -28,6 +28,22 @@ if not os.path.exists(path):
 def findPair(fname): 
     return fname[:-3] + 'out.xml'
 
+def appendKWIC():
+    contextNode = Doc.createElement('ul')
+    docNode = Doc.createElement('h3')
+    docText = Doc.createTextNode(docName)
+    docNode.appendChild(docText)
+    contextNode.appendChild(docNode)
+    for snippet in snippets:
+        print "before: ", snippet
+        snippet = "<p>" + re.sub('&', '', snippet.encode('ascii', 'replace')) + "</p>"
+        print "\nafter: " + snippet
+        parsedSnippet = minidom.parseString(snippet).firstChild
+        print "parsedSnippet: ", parsedSnippet
+        contextNode.appendChild(parsedSnippet)
+    print contextNode.toxml(), " getting appended to contextsTable"
+    contextsTable.appendChild(contextNode)
+
 #truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
 #just using truePositives for testing here, but this will be the format when an error dictionary is established
 #Need FP and FN from each doc, preferably in format {doc:{FP:{entry:code, entry:code, ...}, FN:{entry:code, entry:code}}}
@@ -620,7 +636,7 @@ for doc in diffsDic:
         for char in ['&', ';', '<', '>']:
             if content.firstChild is not None:
                 if char in content.firstChild.nodeValue:
-                    wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue.replace(char, "")
+                    wordDict[content.getAttribute('ID')] = re.sub(char, "", content.firstChild.nodeValue)
                 else:
                     wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
 
@@ -638,9 +654,6 @@ for doc in diffsDic:
 
                 if entry in diffsDic[doc]['FP']:
                     #had added this next line to control flow to list / dic indexes because of an error when assigning @eng and @gs
-                    #if entry not in gsDic[doc]:
-                    #if getting an error, it's definitely from the engDic[doc]
-
                     
                     if entry not in gsDic[doc].keys():
                         if str(engDic[doc][entry])+"ONLY" not in contexts:
@@ -654,7 +667,7 @@ for doc in diffsDic:
                                     temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts:
+                        if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
                             contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
                         contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
 
@@ -671,7 +684,7 @@ for doc in diffsDic:
                                     temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts:
+                        if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
                             contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
                         contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
 
@@ -687,7 +700,7 @@ for doc in diffsDic:
                                 temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                             else:
                                 temp.append(wordDict['entry_' + str(k)])
-                    if doc not in contexts:
+                    if doc not in contexts[str(gsDic[doc][entry])]:
                         contexts[str(gsDic[doc][entry])][doc] = []
                     contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
                     
@@ -701,7 +714,6 @@ for doc in diffsDic:
                         if entry not in gsDic[doc].keys():
                             if str(engDic[doc][entry])+"ONLY" not in contexts:
                                 contexts[str(engDic[doc][entry])+"ONLY"] = {}
-                            #contexts[str(column)+str(row)] = []
                             outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                             temp = []
                             for k in range(i-10, i+10):
@@ -710,7 +722,7 @@ for doc in diffsDic:
                                         temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                     else:
                                         temp.append(wordDict['entry_' + str(k)])
-                            if doc not in contexts:
+                            if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
                                 contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
                             contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
 
@@ -726,18 +738,15 @@ for doc in diffsDic:
                                         temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                     else:
                                         temp.append(wordDict['entry_' + str(k)])
-                            if doc not in contexts:
+                            if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
                                 contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
                             contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
 
                 # If entry is a multi-entry fn
                 elif entry in diffsDic[doc]['FN'].keys():
-                    print entry
-                    print engDic[doc]
                     if str(diffsDic[doc]['FN'][entry]) not in contexts:
                         contexts[str(diffsDic[doc]['FN'][entry])] = {}
                     for j in range(0, len(entry)):
-                        #contexts[str(row)] = []
                         outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                         temp = []
                         for k in range(i+j-10, i+j+10):
@@ -746,10 +755,10 @@ for doc in diffsDic:
                                     temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts:
+                        if doc not in contexts[str(gsDic[doc][entry])]:
                             contexts[str(gsDic[doc][entry])][doc] = []
                         contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
-                        print "MULTI FN ENTRY GENERATED IN CONFUSION ", str(gsDic[doc][entry])
+                        #print "MULTI FN ENTRY GENERATED IN CONFUSION ", str(gsDic[doc][entry])
                 i += len(entry)
 
     output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
@@ -785,6 +794,8 @@ print "Now generating individual details files..."
 #want to do a findall for each combination of error and FN combinations greater than 0
 
 kwicParsed = minidom.parse(path + '\\' + "KWIC_out.xhtml")
+
+parser = etree.XMLParser(recover=True)
 
 #FN File Handling
 for column in values:
@@ -854,11 +865,14 @@ for column in values:
             docNode.appendChild(docText)
             contextNode.appendChild(docNode)
             for snippet in snippets:
-                snippet = "<p>" + re.sub('&', 'and', snippet.encode('ascii', 'replace')) + "</p>"
-                print snippet
-                parsedSnippet = minidom.parseString(snippet).firstChild
-                contextNode.appendChild(parsedSnippet)
-            print contextNode.toxml(), " getting appended to contextsTable"
+                for char in ['&', ';', ' < ', ' > ']:
+                    while char in snippet:
+                        snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
+                    snippetClean = "<p>" + snippet + "</p>"
+                parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
+                print "parsedSnippet (after): ", parsedSnippet
+                finalSnippet = parsedSnippet.firstChild
+                contextNode.appendChild(finalSnippet)
             contextsTable.appendChild(contextNode)
 
         body.appendChild(contextsTable)
@@ -869,95 +883,110 @@ for column in values:
         with open(os.path.join(path, f), 'w') as output:
             output.write(Doc.toxml())
         output.close()
+        #FP File Handling
 
+        for row in values:
+            if finalData[column][row] > 0 and column != row:
+            #if the stat is non-zero and not a true positive               
+                print "column: ", column, " row: ", row
+                Doc = minidom.Document()
+                rootTemp = Doc.createElement('html')
+                rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+                
+                #Header
+                head = Doc.createElement('head')
+                rootTemp.appendChild(head)
+                
+                title = Doc.createElement('title')
+                titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
+                title.appendChild(titleText)
+                head.appendChild(title)
+                
+                css = Doc.createElement('link')
+                css.setAttribute('href', 'css.css')
+                css.setAttribute('type', 'text/css')
+                css.setAttribute('rel', 'stylesheet')
+                head.appendChild(css)
 
-#FP File Handling
-for column in values:
-    for row in values:
-        if finalData[column][row] > 0 and column != row:
-        #if the stat is non-zero and not a true positive               
-            print "column: ", column, " row: ", row
-            Doc = minidom.Document()
-            rootTemp = Doc.createElement('html')
-            rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
-            
-            #Header
-            head = Doc.createElement('head')
-            rootTemp.appendChild(head)
-            
-            title = Doc.createElement('title')
-            titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
-            title.appendChild(titleText)
-            head.appendChild(title)
-            
-            css = Doc.createElement('link')
-            css.setAttribute('href', 'css.css')
-            css.setAttribute('type', 'text/css')
-            css.setAttribute('rel', 'stylesheet')
-            head.appendChild(css)
+                jquery = Doc.createElement('script')
+                jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
+                jqueryText = Doc.createTextNode('//')
+                jquery.appendChild(jqueryText)
+                head.appendChild(jquery)
+                
+                rootTemp.appendChild(head)
+                
+                #Body
+                body = Doc.createElement('body')
+                h1 = Doc.createElement('h1')
+                h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)))
+                h1.appendChild(h1Text)
+                
+                colorKey = Doc.createElement('p')
+                colorKeyText = Doc.createTextNode('Key:')
+                colorKey.appendChild(colorKeyText)
 
-            jquery = Doc.createElement('script')
-            jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
-            jqueryText = Doc.createTextNode('//')
-            jquery.appendChild(jqueryText)
-            head.appendChild(jquery)
-            
-            rootTemp.appendChild(head)
-            
-            #Body
-            body = Doc.createElement('body')
-            h1 = Doc.createElement('h1')
-            h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)))
-            h1.appendChild(h1Text)
-            
-            colorKey = Doc.createElement('p')
-            colorKeyText = Doc.createTextNode('Key:')
-            colorKey.appendChild(colorKeyText)
+                fpKey = Doc.createElement('p')
+                fpKeyText = Doc.createTextNode('False Positive')
+                fpKey.appendChild(fpKeyText)
+                fpKey.setAttribute('style', 'background:red; width:120px;')
+                colorKey.appendChild(fpKey)
+                
+                fnKey = Doc.createElement('p')
+                fnKeyText = Doc.createTextNode('False Negative')
+                fnKey.appendChild(fnKeyText)
+                fnKey.setAttribute('style', 'background:gold; width:120px;')
+                colorKey.appendChild(fnKey)
 
-            fpKey = Doc.createElement('p')
-            fpKeyText = Doc.createTextNode('False Positive')
-            fpKey.appendChild(fpKeyText)
-            fpKey.setAttribute('style', 'background:red; width:120px;')
-            colorKey.appendChild(fpKey)
-            
-            fnKey = Doc.createElement('p')
-            fnKeyText = Doc.createTextNode('False Negative')
-            fnKey.appendChild(fnKeyText)
-            fnKey.setAttribute('style', 'background:gold; width:120px;')
-            colorKey.appendChild(fnKey)
+                body.appendChild(h1)
+                body.appendChild(colorKey)
 
-            body.appendChild(h1)
-            body.appendChild(colorKey)
+                contextsTable = Doc.createElement('table')
 
-            contextsTable = Doc.createElement('table')
+                if str(column)+str(row) in contexts:    
+                    for docName, snippets in contexts[str(column)+str(row)].items():
+                            contextNode = Doc.createElement('ul')
+                            docNode = Doc.createElement('h3')
+                            docText = Doc.createTextNode(docName)
+                            docNode.appendChild(docText)
+                            contextNode.appendChild(docNode)
+                            for snippet in snippets:
+                                for char in ['&', ';', ' < ', ' > ']:
+                                    while char in snippet:
+                                        snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
+                                    snippetClean = "<p>" + snippet + "</p>"
+                                parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
+                                print "parsedSnippet (after): ", parsedSnippet
+                                finalSnippet = parsedSnippet.firstChild
+                                contextNode.appendChild(finalSnippet)
+                            contextsTable.appendChild(contextNode)
 
-            def appendKWIC():
-                contextNode = Doc.createElement('ul')
-                docNode = Doc.createElement('h3')
-                docText = Doc.createTextNode(docName)
-                docNode.appendChild(docText)
-                contextNode.appendChild(docNode)
-                for snippet in snippets:
-                    snippet = "<p>" + re.sub('&', 'and', snippet.encode('ascii', 'replace')) + "</p>"
-                    print snippet
-                    parsedSnippet = minidom.parseString(snippet).firstChild
-                    contextNode.appendChild(parsedSnippet)
-                print contextNode.toxml(), " getting appended to contextsTable"
-                contextsTable.appendChild(contextNode)
-            
-            for docName, snippets in contexts[str(column)+str(row)].items():
-                appendKWIC()
-            for docName, snippets in contexts[str(column)+"ONLY"].items():
-                appendKWIC()
+               # move this into a different loop -- otherwise i'm generating these in the wrong place
+##                for docName, snippets in contexts[str(column)+"ONLY"].items():
+##                        contextNode = Doc.createElement('ul')
+##                        docNode = Doc.createElement('h3')
+##                        docText = Doc.createTextNode(docName)
+##                        docNode.appendChild(docText)
+##                        contextNode.appendChild(docNode)
+##                            for snippet in snippets:
+##                                for char in ['&', ';', '<', '>']:
+##                                    if char in snippet:
+##                                        snippetClean = "<p>" + re.sub(char, "", snippet)+ "</p>"
+##                                        parsedSnippet = minidom.parseString(snippetClean).firstChild
+##                                        print "parsedSnippet (after): ", parsedSnippet
+##                                        contextNode.appendChild(parsedSnippet)
+##                        print contextNode.toxml(), " getting appended to contextsTable"
+##                        contextsTable.appendChild(contextNode)
+                        
 
-            body.appendChild(contextsTable)
-            rootTemp.appendChild(body)
-            Doc.appendChild(rootTemp)
-            f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
-            #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
-            with open(os.path.join(path, f), 'w') as output:
-                output.write(Doc.toxml())
-            output.close()
+                body.appendChild(contextsTable)
+                rootTemp.appendChild(body)
+                Doc.appendChild(rootTemp)
+                f = re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+                #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+                with open(os.path.join(path, f), 'w') as output:
+                    output.write(Doc.toxml())
+                output.close()
             
 print '\nDetails file(s) generated -- written to ' + path
 print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
