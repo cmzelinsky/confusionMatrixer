@@ -714,14 +714,19 @@ for doc in diffsDic:
                         if entry not in gsDic[doc].keys():
                             if str(engDic[doc][entry])+"ONLY" not in contexts:
                                 contexts[str(engDic[doc][entry])+"ONLY"] = {}
-                            outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                            for j in range(0, len(entry)):
+                                outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                             temp = []
-                            for k in range(i-10, i+10):
-                                if k >= 0 and not k > len(wordDict)-1: 
+                            k = i-10
+                            while (k < (i + 10)):
+                                if k >= 0 and not k > len(wordDict)-1:
                                     if k == i:
-                                        temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                        temp.append('<font style="background-color:red"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                        k += len(entry)
+                                        continue
                                     else:
                                         temp.append(wordDict['entry_' + str(k)])
+                                k += 1
                             if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
                                 contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
                             contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
@@ -730,14 +735,19 @@ for doc in diffsDic:
                         elif entry in gsDic[doc].keys():
                             if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
                                 contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
-                            outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                            for j in range(0, len(entry)):
+                                outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
                             temp = []
-                            for k in range(i+j-10, i+j+10):
-                                if k >= 0 and not k > len(wordDict)-1: 
-                                    if k == i+j:
-                                        temp.append('<font style="background-color:red"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                            k = i-10
+                            while (k < (i + 10)):
+                                if k >= 0 and not k > len(wordDict)-1:
+                                    if k == i:
+                                        temp.append('<font style="background-color:red"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                        k += len(entry)
+                                        continue
                                     else:
                                         temp.append(wordDict['entry_' + str(k)])
+                                k += 1
                             if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
                                 contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
                             contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
@@ -889,85 +899,86 @@ for column in values:
         with open(os.path.join(path, f), 'w') as output:
             output.write(Doc.toxml())
         output.close()
+
         #FP File Handling
+for column in values:
+    for row in values:
+        if finalData[column][row] > 0 and column != row:
+        #if the stat is non-zero and not a true positive               
+            print "column: ", column, " row: ", row
+            Doc = minidom.Document()
+            rootTemp = Doc.createElement('html')
+            rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
+            
+            #Header
+            head = Doc.createElement('head')
+            rootTemp.appendChild(head)
+            
+            title = Doc.createElement('title')
+            titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
+            title.appendChild(titleText)
+            head.appendChild(title)
+            
+            css = Doc.createElement('link')
+            css.setAttribute('href', 'css.css')
+            css.setAttribute('type', 'text/css')
+            css.setAttribute('rel', 'stylesheet')
+            head.appendChild(css)
 
-        for row in values:
-            if finalData[column][row] > 0 and column != row:
-            #if the stat is non-zero and not a true positive               
-                print "column: ", column, " row: ", row
-                Doc = minidom.Document()
-                rootTemp = Doc.createElement('html')
-                rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
-                
-                #Header
-                head = Doc.createElement('head')
-                rootTemp.appendChild(head)
-                
-                title = Doc.createElement('title')
-                titleText = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " results")
-                title.appendChild(titleText)
-                head.appendChild(title)
-                
-                css = Doc.createElement('link')
-                css.setAttribute('href', 'css.css')
-                css.setAttribute('type', 'text/css')
-                css.setAttribute('rel', 'stylesheet')
-                head.appendChild(css)
+            jquery = Doc.createElement('script')
+            jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
+            jqueryText = Doc.createTextNode('//')
+            jquery.appendChild(jqueryText)
+            head.appendChild(jquery)
+            
+            rootTemp.appendChild(head)
+            
+            #Body
+            body = Doc.createElement('body')
+            h1 = Doc.createElement('h1')
+            h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)))
+            h1.appendChild(h1Text)
+            
+            colorKey = Doc.createElement('p')
+            colorKeyText = Doc.createTextNode('Key:')
+            colorKey.appendChild(colorKeyText)
 
-                jquery = Doc.createElement('script')
-                jquery.setAttribute('src', 'http://code.jquery.com/jquery-1.10.2.js')
-                jqueryText = Doc.createTextNode('//')
-                jquery.appendChild(jqueryText)
-                head.appendChild(jquery)
-                
-                rootTemp.appendChild(head)
-                
-                #Body
-                body = Doc.createElement('body')
-                h1 = Doc.createElement('h1')
-                h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)))
-                h1.appendChild(h1Text)
-                
-                colorKey = Doc.createElement('p')
-                colorKeyText = Doc.createTextNode('Key:')
-                colorKey.appendChild(colorKeyText)
+            fpKey = Doc.createElement('p')
+            fpKeyText = Doc.createTextNode('False Positive')
+            fpKey.appendChild(fpKeyText)
+            fpKey.setAttribute('style', 'background:red; width:120px;')
+            colorKey.appendChild(fpKey)
+            
+            fnKey = Doc.createElement('p')
+            fnKeyText = Doc.createTextNode('False Negative')
+            fnKey.appendChild(fnKeyText)
+            fnKey.setAttribute('style', 'background:gold; width:120px;')
+            colorKey.appendChild(fnKey)
 
-                fpKey = Doc.createElement('p')
-                fpKeyText = Doc.createTextNode('False Positive')
-                fpKey.appendChild(fpKeyText)
-                fpKey.setAttribute('style', 'background:red; width:120px;')
-                colorKey.appendChild(fpKey)
-                
-                fnKey = Doc.createElement('p')
-                fnKeyText = Doc.createTextNode('False Negative')
-                fnKey.appendChild(fnKeyText)
-                fnKey.setAttribute('style', 'background:gold; width:120px;')
-                colorKey.appendChild(fnKey)
+            body.appendChild(h1)
+            body.appendChild(colorKey)
 
-                body.appendChild(h1)
-                body.appendChild(colorKey)
+            contextsTable = Doc.createElement('table')
 
-                contextsTable = Doc.createElement('table')
+            if str(column)+str(row) in contexts:    
+                for docName, snippets in contexts[str(column)+str(row)].items():
+                        contextNode = Doc.createElement('ul')
+                        docNode = Doc.createElement('h3')
+                        docText = Doc.createTextNode(docName)
+                        docNode.appendChild(docText)
+                        contextNode.appendChild(docNode)
+                        for snippet in snippets:
+                            for char in ['&', ';', ' < ', ' > ']:
+                                while char in snippet:
+                                    snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
+                                snippetClean = "<p>" + snippet + "</p>"
+                            parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
+                            print "parsedSnippet (after): ", parsedSnippet
+                            finalSnippet = parsedSnippet.firstChild
+                            contextNode.appendChild(finalSnippet)
+                        contextsTable.appendChild(contextNode)
 
-                if str(column)+str(row) in contexts:    
-                    for docName, snippets in contexts[str(column)+str(row)].items():
-                            contextNode = Doc.createElement('ul')
-                            docNode = Doc.createElement('h3')
-                            docText = Doc.createTextNode(docName)
-                            docNode.appendChild(docText)
-                            contextNode.appendChild(docNode)
-                            for snippet in snippets:
-                                for char in ['&', ';', ' < ', ' > ']:
-                                    while char in snippet:
-                                        snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
-                                    snippetClean = "<p>" + snippet + "</p>"
-                                parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                                print "parsedSnippet (after): ", parsedSnippet
-                                finalSnippet = parsedSnippet.firstChild
-                                contextNode.appendChild(finalSnippet)
-                            contextsTable.appendChild(contextNode)
-
-               # move this into a different loop -- otherwise i'm generating these in the wrong place
+           # move this into a different loop -- otherwise i'm generating these in the wrong place
 ##                for docName, snippets in contexts[str(column)+"ONLY"].items():
 ##                        contextNode = Doc.createElement('ul')
 ##                        docNode = Doc.createElement('h3')
@@ -983,16 +994,16 @@ for column in values:
 ##                                        contextNode.appendChild(parsedSnippet)
 ##                        print contextNode.toxml(), " getting appended to contextsTable"
 ##                        contextsTable.appendChild(contextNode)
-                        
+                    
 
-                body.appendChild(contextsTable)
-                rootTemp.appendChild(body)
-                Doc.appendChild(rootTemp)
-                f = re.sub('[(),u\']', '', str(column)) + " x " + re.sub('[(),u\']', '', str(row)) + ".xhtml"
-                #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
-                with open(os.path.join(path, f), 'w') as output:
-                    output.write(Doc.toxml())
-                output.close()
+            body.appendChild(contextsTable)
+            rootTemp.appendChild(body)
+            Doc.appendChild(rootTemp)
+            f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+            #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+            with open(os.path.join(path, f), 'w') as output:
+                output.write(Doc.toxml())
+            output.close()
             
 print '\nDetails file(s) generated -- written to ' + path
 print datetime.datetime.now()-startTime, 'to run', len(docs)/2, 'file(s).'
