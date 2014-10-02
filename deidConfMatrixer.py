@@ -746,18 +746,24 @@ for doc in diffsDic:
                 elif entry in diffsDic[doc]['FN'].keys():
                     if str(diffsDic[doc]['FN'][entry]) not in contexts:
                         contexts[str(diffsDic[doc]['FN'][entry])] = {}
+                    temp = []
                     for j in range(0, len(entry)):
+                    #for each entry number in the multi-entry tuple
                         outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                        temp = []
-                        for k in range(i+j-10, i+j+10):
-                            if k >= 0 and not k > len(wordDict)-1: 
-                                if k == i+j:
-                                    temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                else:
-                                    temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts[str(gsDic[doc][entry])]:
-                            contexts[str(gsDic[doc][entry])][doc] = []
-                        contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
+                    k = i-10
+                    while (k < (i + 10)):
+                        if k >= 0 and not k > len(wordDict)-1:
+                            if k == i:
+                                temp.append('<font style="background-color:gold"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                k += len(entry)
+                                continue
+                            else:
+                                temp.append(wordDict['entry_' + str(k)])
+                        k += 1
+                    if doc not in contexts[str(gsDic[doc][entry])]:
+                        contexts[str(gsDic[doc][entry])][doc] = []
+                    contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
+                    #break
                         #print "MULTI FN ENTRY GENERATED IN CONFUSION ", str(gsDic[doc][entry])
                 i += len(entry)
 
