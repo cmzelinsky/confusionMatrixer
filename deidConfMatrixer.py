@@ -879,7 +879,7 @@ for column in values:
             docNode.appendChild(docText)
             contextNode.appendChild(docNode)
             for snippet in snippets:
-                for char in ['&', ';', ' < ', ' > ', '<INC']:
+                for char in ['&', '; ', ' < ', ' > ', '<INC']:
                     while char in snippet:
                         snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
                     snippetClean = "<p>" + snippet + "</p>"
@@ -966,7 +966,7 @@ for column in values:
                     docNode.appendChild(docText)
                     contextNode.appendChild(docNode)
                     for snippet in snippets:
-                        for char in ['&', ';', ' < ', ' > ', '<INC']:
+                        for char in ['&', '; ', ' < ', ' > ', '<INC']:
                             while char in snippet:
                                 snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
                             snippetClean = "<p>" + snippet + "</p>"
@@ -1053,7 +1053,7 @@ for column in values:
                     docNode.appendChild(docText)
                     contextNode.appendChild(docNode)
                     for snippet in snippets:
-                        for char in ['&', ';', ' < ', ' > ', '<INC']:
+                        for char in ['&', '; ', ' < ', ' > ', '<INC']:
                             while char in snippet:
                                 snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
                             snippetClean = "<p>" + snippet + "</p>"
