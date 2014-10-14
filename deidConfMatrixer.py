@@ -20,7 +20,7 @@ from lxml import etree
 
 startTime = datetime.datetime.now()
 #path = sys.argv[1]
-path = "C:/Users/courtney.zelinsky/Desktop/beta"
+path = "C:/Users/courtney.zelinsky/Desktop/deid"
 
 if not os.path.exists(path):
     raise Exception('Invalid path(s)')
@@ -188,6 +188,8 @@ for doc in docs:
 
         #False negatives:
         gsDiffs = {entry:gsDic[doc][entry] for entry in gsDic[doc] if entry not in engDic[doc]}
+        #All entries that are not exactly so in the engine output as they are in the gold standard
+        
         #False positives: 
         engDiffs = {entry:engDic[doc][entry] for entry in engDic[doc] if ((entry not in gsDic[doc]) or (entry in gsDic[doc] and gsDic[doc][entry] != engDic[doc][entry]))}
         #including each kind of fp -- 1) FPs that aren't in the gold standard (e.g. "He" as a last name).
@@ -303,18 +305,11 @@ for doc in docs:
                             #verifying codes are equal
                             #if gsDic[doc][gsKeyTup] == engDic[doc][engKeyTup]: #if codes are the same 
                             if str(gsKeyTup) == str(engKeyTup): 
-                                completeOverlaps += 1
                                 #adding entry tuple and code to the complete overlaps dictionary so as to get tossed into the KWIC function later
                                 compOverlaps[doc][gsKeyTup] = engDic[doc][engKeyTup]
                             else:
-                                if list(sorted(engKeyTup)).reverse() != list(sorted(gsKeyTup)) and list(sorted(gsKeyTup)).reverse() != list(sorted(engKeyTup)) and list(sorted(gsKeyTup)) != list(sorted(engKeyTup)):
-                                    incompOverlaps[doc][gsKeyTup] = engKeyTup
-                                incompleteOverlaps += 1
-                                overlapsForKWIC[doc].append([gsKeyTup, engKeyTup, set(gsKeyTup).intersection(engKeyTup)])
-                    if completeOverlaps > 0 or incompleteOverlaps > 0:
-                        break
-                if incompleteOverlaps > 0 or completeOverlaps > 0:
-                    break
+                                incompOverlaps[doc][gsKeyTup] = engKeyTup
+                                #overlapsForKWIC[doc].append([gsKeyTup, engKeyTup, set(gsKeyTup).intersection(engKeyTup)])
         #print "complete overlap count: " + str(completeOverlaps)
         #print "incomplete overlap count: " + str(incompleteOverlaps)
 
@@ -653,7 +648,6 @@ for doc in diffsDic:
                 #Something in the error list occurs at index i -- need to overwrite for this i and for this entry num
 
                 if entry in diffsDic[doc]['FP']:
-                    #had added this next line to control flow to list / dic indexes because of an error when assigning @eng and @gs
                     
                     if entry not in gsDic[doc].keys():
                         if str(engDic[doc][entry])+"ONLY" not in contexts:
@@ -664,6 +658,9 @@ for doc in diffsDic:
                         for k in range(i-10, i+10):
                             if k >= 0 and not k > len(wordDict)-1:
                                 if k == i:
+                                    #if single entry token is in compOverlaps[doc]
+                                    #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                        #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
@@ -681,6 +678,8 @@ for doc in diffsDic:
                         for k in range(i-10, i+10):
                             if k >= 0 and not k > len(wordDict)-1:
                                 if k == i:
+                                    #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                        #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font></span>')
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
@@ -690,6 +689,10 @@ for doc in diffsDic:
 
                         
                 elif entry in diffsDic[doc]['FN']:
+                    overlaps = []
+                    for val in incompOverlaps[doc].keys():
+                        for substring in val:
+                            overlaps.append((substring,)) 
                     if str(gsDic[doc][entry]) not in contexts:
                         contexts[str(gsDic[doc][entry])] = {}
                     outputParagraph[i] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:gold"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
@@ -697,7 +700,18 @@ for doc in diffsDic:
                     for k in range(i-10, i+10):
                         if k >= 0 and not k > len(wordDict)-1: 
                             if k == i:
-                                temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                for overlap in overlaps:
+                                    print "entry: ", entry, " overlap: ", overlap
+                                    if entry in overlaps and entry[0] in incompOverlaps[doc].values():
+                                        extraNums = []
+                                        for val in incompOverlaps[doc].values():
+                                            #extraNums.append(val.split('_')[1])
+                                            #for extraNum in extraNums:
+                                            temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(extraNum)] + '</strong></font>')
+                                            break
+                                    elif entry == overlap:
+                                        temp.append('<font style="background-color:green;color:gold;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                        break
                             else:
                                 temp.append(wordDict['entry_' + str(k)])
                     if doc not in contexts[str(gsDic[doc][entry])]:
@@ -752,6 +766,12 @@ for doc in diffsDic:
 
                 # If entry is a multi-entry fn
                 elif entry in diffsDic[doc]['FN'].keys():
+                    overlaps = []
+                    for val in incompOverlaps[doc].values():
+                        for substring in val:
+                            overlaps.append(substring)
+                    keys = incompOverlaps[doc].keys()
+                    #using other variables to make the below overlaps procedure less painful
                     if str(diffsDic[doc]['FN'][entry]) not in contexts:
                         contexts[str(diffsDic[doc]['FN'][entry])] = {}
                     temp = []
@@ -762,7 +782,37 @@ for doc in diffsDic:
                     while (k < (i + 10)):
                         if k >= 0 and not k > len(wordDict)-1:
                             if k == i:
-                                temp.append('<font style="background-color:gold"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                for m in range(0, len(entry)):
+                                    #FN Overlap Handling:
+                                    if 'entry_'+str(i+m) in overlaps:
+                                        for key in keys:
+                                            for subentry in key:
+                                            #Green -> token in engine AND gold standard
+
+                                            ## Wait are these keys tuples? Check VVV
+                                            
+                                                if 'entry_'+str(i+m) != subentry:
+                                                #if key != 'entry_'+str(i+m):
+                                                    temp.append('<font style="background-color:green;color:white;"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
+                                                    break
+                                            #Blue -> token in engine
+                                            #Need to go through .values() -- if entry is in .values() but not in the .keys(), then bluueee
+                                                elif 'entry_'+str(i+m) == subentry:
+                                                    temp.append('<font style="background-color:blue;color:white;"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
+                                                    continue
+                                    #Non-overlaps Handling -- everything will just be gold
+                                            if 'entry_'+str(i+m) not in key:
+                                                temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
+                                                continue
+
+                                    
+##                                    for key in gsDic[doc].keys():
+##                                        #if 'entry_'+str(i+m) in gsDic[doc].keys() or ('entry_'+str(i+m) in key and 'entry_'+str(i+m) == key):
+##                                            temp.append('<font style="background-color:green"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
+##                                            continue
+##                                        #elif 'entry_'+str(i+m) not in gsDic[doc].keys() or ('entry_'+str(i+m) not in key and 'entry_'+str(i+m) != key):
+##                                            temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
+##                                            break
                                 k += len(entry)
                                 continue
                             else:
@@ -817,7 +867,7 @@ for column in values:
     #for row in values:
         #if finalData[column][row] > 0 and column != row:
         #if the stat is non-zero and not a true positive
-        print "column: ", column
+        #print "column: ", column
         Doc = minidom.Document()
         rootTemp = Doc.createElement('html')
         rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
@@ -884,7 +934,6 @@ for column in values:
                         snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
                     snippetClean = "<p>" + snippet + "</p>"
                 parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                print "parsedSnippet (after): ", parsedSnippet
                 finalSnippet = parsedSnippet.firstChild
                 contextNode.appendChild(finalSnippet)
             contextsTable.appendChild(contextNode)
@@ -903,7 +952,7 @@ for column in values:
     for row in values:
         if finalData[column][row] > 0 and column != row:
         #if the stat is non-zero and not a true positive               
-            print "column: ", column, " row: ", row
+            #print "column: ", column, " row: ", row
             Doc = minidom.Document()
             rootTemp = Doc.createElement('html')
             rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
@@ -971,7 +1020,6 @@ for column in values:
                                 snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
                             snippetClean = "<p>" + snippet + "</p>"
                         parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                        print "parsedSnippet (after): ", parsedSnippet
                         finalSnippet = parsedSnippet.firstChild
                         contextNode.appendChild(finalSnippet)
                     contextsTable.appendChild(contextNode)
@@ -990,7 +1038,7 @@ for column in values:
     for row in values:
         if finalData[column][row] > 0 and column != row:
         #if the stat is non-zero and not a true positive               
-            print "column: ", column, " row: ", row
+            #print "column: ", column, " row: ", row
             Doc = minidom.Document()
             rootTemp = Doc.createElement('html')
             rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
@@ -1055,10 +1103,9 @@ for column in values:
                     for snippet in snippets:
                         for char in ['&', '; ', ' < ', ' > ', '<INC']:
                             while char in snippet:
-                                snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
+                                snippet = "<p>" + re.sub(char, "", snippet) + "</p>"
                             snippetClean = "<p>" + snippet + "</p>"
                         parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                        print "parsedSnippet (after): ", parsedSnippet
                         finalSnippet = parsedSnippet.firstChild
                         contextNode.appendChild(finalSnippet)
                     contextsTable.appendChild(contextNode)
