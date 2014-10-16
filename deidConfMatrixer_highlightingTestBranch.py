@@ -9,6 +9,7 @@
 ## 1)	It's insufficiently clear if columns are the gold or test set.  [Check]
 ## 2)	There is no link from confusion matrix to details files."       [Check]
 ##
+
 import datetime, os, xml.dom.minidom, datetime, sys, re, time
 from xml.dom.minidom import parse
 import xml.dom.minidom as minidom
@@ -20,7 +21,7 @@ from lxml import etree
 
 startTime = datetime.datetime.now()
 #path = sys.argv[1]
-path = "C:/Users/courtney.zelinsky/Desktop/deid"
+path = "C:/Users/courtney.zelinsky/Desktop/beta"
 
 if not os.path.exists(path):
     raise Exception('Invalid path(s)')
@@ -438,7 +439,7 @@ headerRow.extend(blankTableHeader)
 #adding all test labels and stats labels as headers for the matrix table
 engineHeader = TElement('th', text="Engine:", parent=headerRow)
 engineHeader.attrib['style'] = "background: #0962ac;"
-tableHeaders = [ TElement('th', text=column[0]) for column in values]
+tableHeaders = [ TElement('th', text=column[0], attrib={'title':column[0]}) for column in values]
 tableHeaders.append(TElement('th', text="FNs", attrib={'style':'background:#0962ac'}))
 tableHeaders.append(TElement('th', text="Tp+Fp", attrib={'style':'background:#0962ac;'}))
 tableHeaders.append(TElement('th', text="Fscore", attrib={'style':'background:#0962ac;'}))
@@ -505,10 +506,13 @@ for column in values:
     dataRow.extend(blankData)
     dataRow.extend(comparisonData)
 
-# Generating nested list of values to make column tabulations easier:
+
 listMatrix = []
+spontaneousFalsePos = []
 for column in values:
-        listMatrix.append([finalData[column][row] for row in values])
+    # Generating nested list of values to make column tabulations easier:
+    listMatrix.append([finalData[column][row] for row in values])
+        
 
 #Generating tds for tabulations of columns        
 ##engSumsTr = TElement('tr', parent=table)
@@ -533,6 +537,20 @@ falseNegs = TElement('th', text='False Negatives: ' + str(falseNegCount), parent
 falsePos = TElement('th', text="False Positives: " + str(falsePosCount), parent=baseStats)
 precision = TElement('th', text='Precision (TPs/TPs+FPs): ' + str(float(truePosCount)/float(truePosCount+falsePosCount)), parent=baseStats)
 recall = TElement('th', text='Recall (TPs/TPs+FNs): ' + str(float(truePosCount)/float(truePosCount+falseNegCount)), parent=baseStats)
+
+hrBreak = TElement('hr', parent=body)
+
+# Want to put the spontaneous false positives into a menu below the ML stats
+spontaneousFalsePos = TElement('table', parent=body)
+spontaneousFalsePos.attrib['style'] = "border:0px"
+
+
+tr = TElement('tr', parent=spontaneousFalsePos)
+for column in values:
+    th = TElement('th')
+    th.append(TElement('a', text=column[0], attrib={'href':str(re.sub('[(),u\']', '', str(column)))+'_spont.xhtml', 'style':'font-weight:bold; color:#fff;'}))
+    tr.append(th)
+        
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
 
@@ -576,7 +594,7 @@ print '\n\nStarting details file processing...'
 
 values = sorted([key for key in finalData.keys()])
 
-"""Creates readable xhtml output contexts """
+"""Creates readable xhtml output contexts"""
 
 parser = etree.XMLParser(encoding="utf-8", recover=True)
 
@@ -660,7 +678,7 @@ for doc in diffsDic:
                                 if k == i:
                                     #if single entry token is in compOverlaps[doc]
                                     #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
-                                        #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                    #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                 else:
                                     temp.append(wordDict['entry_' + str(k)])
@@ -702,17 +720,6 @@ for doc in diffsDic:
                     for k in range(i-10, i+10):
                         if k >= 0 and not k > len(wordDict)-1: 
                             if k == i:
-##                                for overlap in overlaps:
-##                                    print "entry: ", entry, " overlap: ", overlap
-##                                    if entry in overlaps and entry[0] in incompOverlaps[doc].values():
-##                                        for val in incompOverlaps[doc].values():
-##                                            #extraNums.append(val.split('_')[1])
-##                                            #for extraNum in extraNums:
-##                                            temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-##                                            break
-##                                    elif entry == overlap:
-##                                        temp.append('<font style="background-color:green;color:gold;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-##                                        break
                                 if 'entry_'+str(i) in overlaps:
                                     for key in overlapKeys:
                                         #Green -> token in engine AND gold standard
@@ -808,9 +815,6 @@ for doc in diffsDic:
                                     if 'entry_'+str(i+m) in overlaps:
                                         for key in overlapKeys:
                                             #Green -> token in engine AND gold standard
-
-                                            ## Wait are these keys tuples? Check. VVV
-                                            
                                             if 'entry_'+str(i+m) in key and 'entry_'+str(i+m) in overlaps:
                                                 #if key != 'entry_'+str(i+m):
                                                 temp.append('<font style="background-color:green;color:white;"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
@@ -819,17 +823,9 @@ for doc in diffsDic:
                                     elif 'entry_'+str(i+m) not in overlapValues:
                                         temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
                                         continue
-##                                    for key in gsDic[doc].keys():
-##                                        #if 'entry_'+str(i+m) in gsDic[doc].keys() or ('entry_'+str(i+m) in key and 'entry_'+str(i+m) == key):
-##                                            temp.append('<font style="background-color:green"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
-##                                            continue
-##                                        #elif 'entry_'+str(i+m) not in gsDic[doc].keys() or ('entry_'+str(i+m) not in key and 'entry_'+str(i+m) != key):
-##                                            temp.append('<font style="background-color:gold"><strong>' + wordDict['entry_' + str(i+m)] + '</strong></font>')
-##                                            break
                                 k += len(entry)
                                 continue
                             #Blue -> token in engine
-                            #Need to go through .values() -- if entry is in .values() but not in the .keys(), then bluueee
                             elif 'entry_'+str(k) in overlaps:
                                 for key in overlapKeys:
                                     if 'entry_'+str(k) not in key:
@@ -923,20 +919,34 @@ for column in values:
         h1.appendChild(h1Text)
         
         colorKey = Doc.createElement('p')
-        colorKeyText = Doc.createTextNode('Key:')
-        colorKey.appendChild(colorKeyText)
 
-        fpKey = Doc.createElement('p')
-        fpKeyText = Doc.createTextNode('False Positive')
-        fpKey.appendChild(fpKeyText)
-        fpKey.setAttribute('style', 'background:red; width:120px;')
-        colorKey.appendChild(fpKey)
-        
-        fnKey = Doc.createElement('p')
-        fnKeyText = Doc.createTextNode('False Negative')
+        fnKeys = Doc.createElement('p')
+
+        fn = Doc.createElement('span')
+        fnTitle = Doc.createTextNode('False Negative: ')
+        fn.appendChild(fnTitle)
+        fnKeys.setAttribute('style', 'font-weight:bold;')
+        fnKeys.appendChild(fn)
+
+        fnKey = Doc.createElement('span')
+        fnKeyText = Doc.createTextNode('Gold Standard ')
         fnKey.appendChild(fnKeyText)
         fnKey.setAttribute('style', 'background:gold; width:120px;')
-        colorKey.appendChild(fnKey)
+        fnKeys.appendChild(fnKey)
+
+        overlapKey = Doc.createElement('span')
+        overlapKeyText = Doc.createTextNode(' Overlap ')
+        overlapKey.appendChild(overlapKeyText)
+        overlapKey.setAttribute('style', 'background:green; color:white; width:100px;')
+        fnKeys.appendChild(overlapKey)
+
+        engineKey = Doc.createElement('span')
+        engineKeyText = Doc.createTextNode(' Engine Output')
+        engineKey.appendChild(engineKeyText)
+        engineKey.setAttribute('style', 'background:blue; color:white; width:120px;')
+        fnKeys.appendChild(engineKey)
+
+        colorKey.appendChild(fnKeys)
 
         body.appendChild(h1)
         body.appendChild(colorKey)
@@ -1008,20 +1018,19 @@ for column in values:
             h1.appendChild(h1Text)
             
             colorKey = Doc.createElement('p')
-            colorKeyText = Doc.createTextNode('Key:')
-            colorKey.appendChild(colorKeyText)
 
-            fpKey = Doc.createElement('p')
-            fpKeyText = Doc.createTextNode('False Positive')
+            fp = Doc.createElement('span')
+            fpTitle = Doc.createTextNode('False Positive: ')
+            fp.appendChild(fpTitle)
+            fp.setAttribute('style', 'font-weight:bold;')
+
+            fpKey = Doc.createElement('span')
+            fpKeyText = Doc.createTextNode('Engine Output ')
             fpKey.appendChild(fpKeyText)
-            fpKey.setAttribute('style', 'background:red; width:120px;')
+            fpKey.setAttribute('style', 'background:red; color:white; width:120px;')
+
+            colorKey.appendChild(fp)
             colorKey.appendChild(fpKey)
-            
-            fnKey = Doc.createElement('p')
-            fnKeyText = Doc.createTextNode('False Negative')
-            fnKey.appendChild(fnKeyText)
-            fnKey.setAttribute('style', 'background:gold; width:120px;')
-            colorKey.appendChild(fnKey)
 
             body.appendChild(h1)
             body.appendChild(colorKey)
@@ -1094,20 +1103,19 @@ for column in values:
             h1.appendChild(h1Text)
             
             colorKey = Doc.createElement('p')
-            colorKeyText = Doc.createTextNode('Key:')
-            colorKey.appendChild(colorKeyText)
 
-            fpKey = Doc.createElement('p')
-            fpKeyText = Doc.createTextNode('False Positive')
+            fp = Doc.createElement('span')
+            fpTitle = Doc.createTextNode('False Positive: ')
+            fp.appendChild(fpTitle)
+            fp.setAttribute('style', 'font-weight:bold;')
+
+            fpKey = Doc.createElement('span')
+            fpKeyText = Doc.createTextNode('Engine Output ')
             fpKey.appendChild(fpKeyText)
-            fpKey.setAttribute('style', 'background:red; width:120px;')
+            fpKey.setAttribute('style', 'background:red; color:white; width:120px;')
+
+            colorKey.appendChild(fp)
             colorKey.appendChild(fpKey)
-            
-            fnKey = Doc.createElement('p')
-            fnKeyText = Doc.createTextNode('False Negative')
-            fnKey.appendChild(fnKeyText)
-            fnKey.setAttribute('style', 'background:gold; width:120px;')
-            colorKey.appendChild(fnKey)
 
             body.appendChild(h1)
             body.appendChild(colorKey)
