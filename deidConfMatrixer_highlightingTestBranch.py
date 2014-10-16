@@ -133,7 +133,7 @@ for doc in docs:
             bindings = []
             for child in entry.firstChild.childNodes:
                 if child.localName == 'binding':
-                    bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
+                    bindings.extend([bindingNode.getAttribute('ref') for bindingNode in child.childNodes if bindingNode.localName == "narrativeBinding"])
                     entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     gsDic[doc][entries] = value
@@ -150,7 +150,7 @@ for doc in docs:
             bindings = []
             for child in entry.firstChild.childNodes:
                 if child.localName == 'binding':
-                    bindings.extend([narrativeBindings.getAttribute('ref') for narrativeBindings in child.childNodes])
+                    bindings.extend([bindingNode.getAttribute('ref') for bindingNode in child.childNodes if bindingNode.localName == "narrativeBinding"])
                     entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     if entries in engDic[doc]:
@@ -680,7 +680,7 @@ for doc in diffsDic:
                                     #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
                                     #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                else:
+                                elif 'entry_'+str(k) in wordDict:
                                     temp.append(wordDict['entry_' + str(k)])
                         if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
                             contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
@@ -699,7 +699,8 @@ for doc in diffsDic:
                                     #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
                                         #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font></span>')
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                else:
+                                elif 'entry_' + str(k) in wordDict:
+                                # Getting a strange issue in the xml wherein some content IDs are just being skipped completely and leaving a gap, so...
                                     temp.append(wordDict['entry_' + str(k)])
                         if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
                             contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
@@ -739,7 +740,7 @@ for doc in diffsDic:
                                         temp.append('<font style="background-color:blue;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                         #then will need to add one to k? so as to balance
                                         break
-                            else:
+                            elif 'entry_'+str(k) in wordDict:
                                 temp.append(wordDict['entry_' + str(k)])
                     if doc not in contexts[str(gsDic[doc][entry])]:
                         contexts[str(gsDic[doc][entry])][doc] = []
@@ -763,7 +764,7 @@ for doc in diffsDic:
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
                                     k += len(entry)
                                     continue
-                                else:
+                                elif 'entry_'+str(k) in wordDict:
                                     temp.append(wordDict['entry_' + str(k)])
                             k += 1
                         if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
@@ -784,7 +785,7 @@ for doc in diffsDic:
                                     temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
                                     k += len(entry)
                                     continue
-                                else:
+                                elif 'entry_'+str(k) in wordDict:
                                     temp.append(wordDict['entry_' + str(k)])
                             k += 1
                         if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
@@ -832,7 +833,7 @@ for doc in diffsDic:
                                         temp.append('<font style="background-color:blue;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
                                         #then will need to add one to k? so as to balance
                                         break
-                            else:
+                            elif 'entry_'+str(k) in wordDict:
                                 temp.append(wordDict['entry_' + str(k)])
                         k += 1
                     if doc not in contexts[str(gsDic[doc][entry])]:
