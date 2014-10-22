@@ -136,9 +136,15 @@ for doc in docs:
                     bindings.extend([bindingNode.getAttribute('ref') for bindingNode in child.childNodes if bindingNode.localName == "narrativeBinding"])
                     entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    gsDic[doc][entries] = value
+                    if len(entries) == 0:
+                        #takes out nodes without text which are generated from section header MIMs
+                        print "CONTINUING"
+                        continue
+                    else:
+                        gsDic[doc][entries] = value
         for k, v in gsDic[doc].items():
             gsDic[doc][k] = tuple(v)
+            #print "gs dic: ", k, tuple(v)
                         
         # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
         # --> Create alert that funnels gs documents having overlapping MIMs and output at end of script
@@ -149,16 +155,21 @@ for doc in docs:
         for entry in entries:
             bindings = []
             for child in entry.firstChild.childNodes:
+                
                 if child.localName == 'binding':
                     bindings.extend([bindingNode.getAttribute('ref') for bindingNode in child.childNodes if bindingNode.localName == "narrativeBinding"])
                     entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
-                    if entries in engDic[doc]:
+                    if len(entries) == 0:
+                        print "CONTINUING"
+                        continue
+                    elif entries in engDic[doc]:
                         engDic[doc][entries].append("".join(value))
-                    else:
+                    elif entries not in engDic[doc]:
                         engDic[doc][entries] = value
         for k, v in engDic[doc].items():
             engDic[doc][k] = tuple(v)
+            #print "eng dic: ", k, tuple(v)
          
         ## Begin comparison of data structures
 
@@ -667,46 +678,94 @@ for doc in diffsDic:
 
                 if entry in diffsDic[doc]['FP']:
                     
+                    #Last Name "He"-type spontaneous FPs
                     if entry not in gsDic[doc].keys():
-                        if str(engDic[doc][entry])+"ONLY" not in contexts:
-                            contexts[str(engDic[doc][entry])+"ONLY"] = {}
-                        #LAST_NAME "He"-type spontaneous FPs
-                        outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
-                        temp = []
-                        for k in range(i-10, i+10):
-                            if k >= 0 and not k > len(wordDict)-1:
-                                if k == i:
-                                    #if single entry token is in compOverlaps[doc]
-                                    #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
-                                    #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                    temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                elif 'entry_'+str(k) in wordDict:
-                                    temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
-                            contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
-                        contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
+
+                        #Multi-code
+                        if len(engDic[doc][entry]) > 1:
+                            for codeValue in engDic[doc][entry]:
+                                if str((codeValue,))+"ONLY" not in contexts:
+                                    contexts[str((codeValue,))+"ONLY"] = {}
+                                outputParagraph[i] = '<error id="' + str(entry) + '" title="' + "Engine (spont): " + str(codeValue) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                                temp = []
+                                for k in range(i-10, i+10):
+                                    if k >= 0 and not k > len(wordDict)-1:
+                                        if k == i:
+                                            #if single entry token is in compOverlaps[doc]
+                                            #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                            #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                            temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                        elif 'entry_'+str(k) in wordDict:
+                                            temp.append(wordDict['entry_' + str(k)])
+                                if doc not in contexts[str((codeValue,))+"ONLY"]:
+                                    contexts[str((codeValue,))+"ONLY"][doc] = []
+                                contexts[str((codeValue,))+"ONLY"][doc].append(''.join(temp))
+                                break
+
+                        #Single code
+                        elif len(engDic[doc][entry]) == 1:
+                            if str(engDic[doc][entry])+"ONLY" not in contexts:
+                                contexts[str(engDic[doc][entry])+"ONLY"] = {}
+                            outputParagraph[i] = '<error id="' + str(entry) + '" title="' + "Engine (spont): " + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                            temp = []
+                            for k in range(i-10, i+10):
+                                if k >= 0 and not k > len(wordDict)-1:
+                                    if k == i:
+                                        #if single entry token is in compOverlaps[doc]
+                                        #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                        #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                        temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                    elif 'entry_'+str(k) in wordDict:
+                                        temp.append(wordDict['entry_' + str(k)])
+                            if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
+                                contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
+                            contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
 
                         
                     elif entry in gsDic[doc].keys():
-                        #FP mismatch
-                        if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
-                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
-                        outputParagraph[i] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
-                        temp = []
-                        for k in range(i-10, i+10):
-                            if k >= 0 and not k > len(wordDict)-1:
-                                if k == i:
-                                    #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
-                                        #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font></span>')
-                                    temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                elif 'entry_' + str(k) in wordDict:
-                                # Getting a strange issue in the xml wherein some content IDs are just being skipped completely and leaving a gap, so...
-                                    temp.append(wordDict['entry_' + str(k)])
-                        if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
-                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
-                        contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
-
                         
+                        #FP mismatch - multicode
+                        if len(engDic[doc][entry]) > 1:
+                            for codeValue in engDic[doc][entry]:
+                                if str(gsDic[doc][entry])+str((codeValue,)) not in contexts:
+                                    contexts[str(gsDic[doc][entry])+str((codeValue,))] = {}
+                                if str(gsDic[doc][entry]) != str((codeValue,)):
+                                    outputParagraph[i] = '<error id="' + str(entry) + '" title="' + "Engine Mismatch: " + str(codeValue) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                                    temp = []
+                                    for k in range(i-10, i+10):
+                                        if k >= 0 and not k > len(wordDict)-1:
+                                            if k == i:
+                                                #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                                    #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font></span>')
+                                                temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                            elif 'entry_' + str(k) in wordDict:
+                                            # Getting a strange issue in the xml wherein some content IDs are just being skipped completely and leaving a gap, so...
+                                                temp.append(wordDict['entry_' + str(k)])
+                                    if doc not in contexts[str(gsDic[doc][entry])+str((codeValue,))]:
+                                        contexts[str(gsDic[doc][entry])+str((codeValue,))][doc] = []
+                                    contexts[str(gsDic[doc][entry])+str((codeValue,))][doc].append(''.join(temp))
+
+                        #FP mismatch - single code
+                        elif len(engDic[doc][entry]) == 1:
+                            if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
+                            if str(gsDic[doc][entry]) != str(engDic[doc][entry]):
+                                outputParagraph[i] = '<error id="' + str(entry) + '" title="' + "Engine Mismatch: " + str(engDic[doc][entry]) + '" gs="' + str(gsDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(i)] + '</strong></font></error>'
+                                temp = []
+                                for k in range(i-10, i+10):
+                                    if k >= 0 and not k > len(wordDict)-1:
+                                        if k == i:
+                                            #if entry in compOverlaps[doc].keys(): #and compOverlaps[doc]["(" + entry + ",)"] == contexts[str(engDic[doc][entry])]
+                                                #temp.append('<span title="' + re.sub('[(),u\']', '', str(compOverlaps[doc][entry])) + '"><font style="background-color:purple;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font></span>')
+                                            temp.append('<font style="background-color:red;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
+                                        elif 'entry_' + str(k) in wordDict:
+                                        # Getting a strange issue in the xml wherein some content IDs are just being skipped completely and leaving a gap, so...
+                                            temp.append(wordDict['entry_' + str(k)])
+                                if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
+                                    contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
+
+           
                 elif entry in diffsDic[doc]['FN']:
                     overlaps = []
                     for val in incompOverlaps[doc].keys():
@@ -749,48 +808,99 @@ for doc in diffsDic:
                     
             elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
                 # MULTI-ENTRY HANDLING e.g. ('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
+                
                 if entry in diffsDic[doc]['FP'].keys():
-                    #if entry is a non-mismatch (spontaneous) multi-entry fp
+                    #if entry is a spontaneous multi-entry fp
                     if entry not in gsDic[doc].keys():
-                        if str(engDic[doc][entry])+"ONLY" not in contexts:
-                            contexts[str(engDic[doc][entry])+"ONLY"] = {}
-                        for j in range(0, len(entry)):
-                            outputParagraph[i+j] = '<error id="' + str(entry) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                        temp = []
-                        k = i-10
-                        while (k < (i + 10)):
-                            if k >= 0 and not k > len(wordDict)-1:
-                                if k == i:
-                                    temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
-                                    k += len(entry)
-                                    continue
-                                elif 'entry_'+str(k) in wordDict:
-                                    temp.append(wordDict['entry_' + str(k)])
-                            k += 1
-                        if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
-                            contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
-                        contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
+                        
+                        if len(engDic[doc][entry]) > 1:
+                            #multi-code spontaneous multi-entry
+                            for codeValue in engDic[doc][entry]:
+                                if str((codeValue,))+"ONLY" not in contexts:
+                                    contexts[str((codeValue,))+"ONLY"] = {}
+                                for j in range(0, len(entry)):
+                                    outputParagraph[i+j] = '<error id="' + str(entry) + '" title="' + str(codeValue) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                                temp = []
+                                k = i-10
+                                while (k < (i + 10)):
+                                    if k >= 0 and not k > len(wordDict)-1:
+                                        if k == i:
+                                            temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                            k += len(entry)
+                                            continue
+                                        elif 'entry_'+str(k) in wordDict:
+                                            temp.append(wordDict['entry_' + str(k)])
+                                    k += 1
+                                if doc not in contexts[str((codeValue,))+"ONLY"]:
+                                    contexts[str((codeValue,))+"ONLY"][doc] = []
+                                contexts[str((codeValue,))+"ONLY"][doc].append(''.join(temp))
+                                break
+                                
+                        #single-code spontaneous multi-entry
+                        elif len(engDic[doc][entry]) == 1:
+                            if str(engDic[doc][entry])+"ONLY" not in contexts:
+                                contexts[str(engDic[doc][entry])+"ONLY"] = {}
+                            for j in range(0, len(entry)):
+                                outputParagraph[i+j] = '<error id="' + str(entry) + '" title="' + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                            temp = []
+                            k = i-10
+                            while (k < (i + 10)):
+                                if k >= 0 and not k > len(wordDict)-1:
+                                    if k == i:
+                                        temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                        k += len(entry)
+                                        continue
+                                    elif 'entry_'+str(k) in wordDict:
+                                        temp.append(wordDict['entry_' + str(k)])
+                                k += 1
+                            if doc not in contexts[str(engDic[doc][entry])+"ONLY"]:
+                                contexts[str(engDic[doc][entry])+"ONLY"][doc] = []
+                            contexts[str(engDic[doc][entry])+"ONLY"][doc].append(''.join(temp))
 
                     # If entry is a mismatch multi-entry fp
                     elif entry in gsDic[doc].keys():
-                        if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
-                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
-                        for j in range(0, len(entry)):
-                            outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" eng="' + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
-                        temp = []
-                        k = i-10
-                        while (k < (i + 10)):
-                            if k >= 0 and not k > len(wordDict)-1:
-                                if k == i:
-                                    temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
-                                    k += len(entry)
-                                    continue
-                                elif 'entry_'+str(k) in wordDict:
-                                    temp.append(wordDict['entry_' + str(k)])
-                            k += 1
-                        if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
-                            contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
-                        contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
+                        if len(engDic[doc][entry]) > 1:
+                            for codeValue in engDic[doc][entry]:
+                                if str(gsDic[doc][entry])+str((codeValue,)) not in contexts:
+                                    contexts[str(gsDic[doc][entry])+str((codeValue,))] = {}
+                                if str(gsDic[doc][entry]) != str((codeValue,)):
+                                    for j in range(0, len(entry)):
+                                        outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" title="' + "Engine (spont): " + str(codeValue) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                                    temp = []
+                                    k = i-10
+                                    while (k < (i + 10)):
+                                        if k >= 0 and not k > len(wordDict)-1:
+                                            if k == i:
+                                                temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                                k += len(entry)
+                                                continue
+                                            elif 'entry_'+str(k) in wordDict:
+                                                temp.append(wordDict['entry_' + str(k)])
+                                        k += 1
+                                    if doc not in contexts[str(gsDic[doc][entry])+str((codeValue,))]:
+                                        contexts[str(gsDic[doc][entry])+str((codeValue,))][doc] = []
+                                    contexts[str(gsDic[doc][entry])+str((codeValue,))][doc].append(''.join(temp))
+
+                        elif len(engDic[doc][entry]) == 1:
+                            if str(gsDic[doc][entry])+str(engDic[doc][entry]) not in contexts:
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])] = {}
+                            if str(gsDic[doc][entry]) != str(engDic[doc][entry]):
+                                for j in range(0, len(entry)):
+                                    outputParagraph[i+j] = '<error id="' + str(entry) + '" gs="' + str(gsDic[doc][entry]) + '" title="' + "Engine (spont): " + str(engDic[doc][entry]) + '"><font style="background-color:red;color:white;"><strong>' + wordDict[entry[j]] + '</strong></font></error>'
+                                temp = []
+                                k = i-10
+                                while (k < (i + 10)):
+                                    if k >= 0 and not k > len(wordDict)-1:
+                                        if k == i:
+                                            temp.append('<font style="background-color:red;color:white;"><strong>' + "".join([wordDict['entry_' + str(i+m)] for m in range(0, len(entry))]) + '</strong></font>')
+                                            k += len(entry)
+                                            continue
+                                        elif 'entry_'+str(k) in wordDict:
+                                            temp.append(wordDict['entry_' + str(k)])
+                                    k += 1
+                                if doc not in contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])]:
+                                    contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc] = []
+                                contexts[str(gsDic[doc][entry])+str(engDic[doc][entry])][doc].append(''.join(temp))
 
                 # If entry is a multi-entry fn
                 elif entry in diffsDic[doc]['FN'].keys():
@@ -953,31 +1063,32 @@ for column in values:
         body.appendChild(colorKey)
 
         contextsTable = Doc.createElement('table')
-        
-        for docName, snippets in contexts[str(column)].items():
-            contextNode = Doc.createElement('ul')
-            docNode = Doc.createElement('h3')
-            docText = Doc.createTextNode(docName)
-            docNode.appendChild(docText)
-            contextNode.appendChild(docNode)
-            for snippet in snippets:
-                for char in ['&', '; ', ' < ', ' > ', '<INC']:
-                    while char in snippet:
-                        snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
-                    snippetClean = "<p>" + snippet + "</p>"
-                parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                finalSnippet = parsedSnippet.firstChild
-                contextNode.appendChild(finalSnippet)
-            contextsTable.appendChild(contextNode)
 
-        body.appendChild(contextsTable)
-        rootTemp.appendChild(body)
-        Doc.appendChild(rootTemp)
-        f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
-        #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
-        with open(os.path.join(path, f), 'w') as output:
-            output.write(Doc.toxml())
-        output.close()
+        if str(column) in contexts:
+            for docName, snippets in contexts[str(column)].items():
+                contextNode = Doc.createElement('ul')
+                docNode = Doc.createElement('h3')
+                docText = Doc.createTextNode(docName)
+                docNode.appendChild(docText)
+                contextNode.appendChild(docNode)
+                for snippet in snippets:
+                    for char in ['&', '; ', ' < ', ' > ', '<INC']:
+                        while char in snippet:
+                            snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
+                        snippetClean = "<p>" + snippet + "</p>"
+                    parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
+                    finalSnippet = parsedSnippet.firstChild
+                    contextNode.appendChild(finalSnippet)
+                contextsTable.appendChild(contextNode)
+
+            body.appendChild(contextsTable)
+            rootTemp.appendChild(body)
+            Doc.appendChild(rootTemp)
+            f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
+            #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
+            with open(os.path.join(path, f), 'w') as output:
+                output.write(Doc.toxml())
+            output.close()
 
 #FP Mismatch File Handling
 for column in values:
