@@ -4,7 +4,7 @@
 ##
 ## Call on cmd line with arg[1] = path containing all files for testing, gs files in the format ~.xml and their engine counterparts ~.out.xml
 ##
-## Henry's wishlist:
+## Wishlist:
 ## "There were 2 minor warts I know of in the code.  
 ## 1)	It's insufficiently clear if columns are the gold or test set.  [Check]
 ## 2)	There is no link from confusion matrix to details files."       [Check]
