@@ -2,12 +2,8 @@
 ## author : Courtney Zelinsky
 ## created : 5/13/14
 ##
-## Call on cmd line with arg[1] = path containing all files for testing, gs files in the format ~.xml and their engine counterparts ~.out.xml
-##
-## Wishlist:
-## "There were 2 minor warts I know of in the code.  
-## 1)	It's insufficiently clear if columns are the gold or test set.  [Check]
-## 2)	There is no link from confusion matrix to details files."       [Check]
+## Call on cmd line with arg[1] = path containing all files for testing, arg[2] = D, T, S, or C to initialize test type (Deid, Temporality, Subject, or Certainty)
+## Please have gold standard files in the format ~.xml and their engine counterparts as ~.out.xml
 ##
 
 import datetime, os, xml.dom.minidom, datetime, sys, re, time
@@ -20,8 +16,9 @@ from lxml import etree
 
 
 startTime = datetime.datetime.now()
-#path = sys.argv[1]
-path = "C:/Users/courtney.zelinsky/Desktop/beta"
+path = sys.argv[1]
+
+modifierType = sys.argv[2]
 
 if not os.path.exists(path):
     raise Exception('Invalid path(s)')
@@ -36,13 +33,13 @@ def appendKWIC():
     docNode.appendChild(docText)
     contextNode.appendChild(docNode)
     for snippet in snippets:
-        print "before: ", snippet
-        snippet = "<p>" + re.sub('&', '', snippet.encode('ascii', 'replace')) + "</p>"
-        print "\nafter: " + snippet
-        parsedSnippet = minidom.parseString(snippet).firstChild
-        print "parsedSnippet: ", parsedSnippet
-        contextNode.appendChild(parsedSnippet)
-    print contextNode.toxml(), " getting appended to contextsTable"
+        for char in ['&', '; ', ' < ', ' > ', '<INC']:
+            while char in snippet:
+                snippet = "<p>" + re.sub(char, "", snippet) + "</p>"
+            snippetClean = "<p>" + snippet + "</p>"
+        parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
+        finalSnippet = parsedSnippet.firstChild
+        contextNode.appendChild(finalSnippet)
     contextsTable.appendChild(contextNode)
 
 #truePositivesMaster = {"B~ClinicalDocument_2531456463.xml":{('entry_60', 'entry_61'): (u'ABSOLUTE_DATE',), ('entry_201', 'entry_202'): (u'ABSOLUTE_DATE',), ('entry_185', 'entry_186'): (u'ABSOLUTE_DATE',), ('entry_235', 'entry_236'): (u'ABSOLUTE_DATE',), ('entry_20', 'entry_21'): (u'ABSOLUTE_DATE',), ('entry_282',): (u'LAST_NAME',), ('entry_144', 'entry_145'): (u'ABSOLUTE_DATE',), ('entry_18', 'entry_19'): (u'ABSOLUTE_DATE',), ('entry_140', 'entry_141'): (u'ABSOLUTE_DATE',), ('entry_244', 'entry_245'): (u'ABSOLUTE_DATE',), ('entry_566',): (u'LOCATION',), ('entry_216', 'entry_217'): (u'ABSOLUTE_DATE',), ('entry_13', 'entry_14', 'entry_15'): (u'ABSOLUTE_DATE',), ('entry_85', 'entry_86'): (u'ABSOLUTE_DATE',), ('entry_131', 'entry_132'): (u'ABSOLUTE_DATE',), ('entry_256', 'entry_257'): (u'ABSOLUTE_DATE',), ('entry_388',): (u'LAST_NAME',), ('entry_8',): (u'LAST_NAME',), ('entry_271', 'entry_272'): (u'ABSOLUTE_DATE',), ('entry_7',): (u'FEMALE_NAME',), ('entry_228', 'entry_229'): (u'ABSOLUTE_DATE',), ('entry_70', 'entry_71'): (u'ABSOLUTE_DATE',), ('entry_285',): (u'AGE',), ('entry_103', 'entry_104'): (u'ABSOLUTE_DATE',)}}
@@ -68,9 +65,22 @@ docCount=0
 docs = filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'xml' , os.listdir(path))
 
 # Labels to be tested -- implement later as a dictionary later so as to accommodate Certainty, Temporality, Subject, Acuity, etc.
-matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
-(u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
-(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)]
+
+##matrixValues = [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',), (u'DATE',), 
+##(u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',), (u'NAME',),
+##(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)]
+
+modifiersLabels = {"D": [(u'LAST_NAME',), (u'MALE_NAME',), (u'FEMALE_NAME',), (u'PHONE_NUMBER',), (u'MEDICAL_RECORD_NUMBER',), (u'ABSOLUTE_DATE',),
+    (u'DATE',), (u'ADDRESS',), (u'LOCATION',), (u'AGE',), (u'SOCIAL_SECURITY_NUMBER',), (u'CERTIFICATE_OR_LICENSE_NUMBER',), (u'ID_OR_CODE_NUMBER',),
+    (u'NAME',),(u'ORGANIZATION',), (u'URL',), (u'E_MAIL_ADDRESS',), (u'TIME',), (u'OTHER',), (u'HOSPITAL',), (u'INITIAL',), (u'HOSPITAL_SUB',)],
+"C":[(u'MAYBE',), (u'CERTAIN',), (u'HEDGED',), (u'HYPOTHETICAL',), (u'RULED_OUT',)],
+"T":[(u'PAST',),(u'RECENTPAST',), (u'HISTORICAL',), (u'FUTURE',), (u'CURRENT',), (u'PRESENT',)],
+"S":[(u'SUBJECT',), (u'PROVIDER',), (u'AUTHOR',), (u'BABY',), (u'NONFAMILY',), (u'FAMILY',), (u'SIBLING',), (u'MOTHER',), (u'FATHER',), (u'AUNT',), (u'UNCLE',),
+    (u'GRANDPARENT',), (u'CHILD',)]}
+
+for modifierTitle in modifiersLabels.keys():
+    if modifierTitle == modifierType:
+        matrixValues = modifiersLabels[modifierType]
 
 allData = {}
 truePosCount = 0
@@ -101,13 +111,10 @@ gsDic = {}
 engDic = {}
 
 
+
 for doc in docs:
     if not doc.endswith('.out.xml'):
         docCount += 1
-        #for x in xrange(0, len(docs)/2):
-        #percent = float(x) / (len(docs)/2)
-        #hashes = '#' * int(round(percent * 20))
-        #spaces = ' ' * (20 - len(hashes))
         sys.stdout.write("\r_______________________________________\n\nNow running document %s out of %s...\n_______________________________________\n" % (docCount, len(docs)/2))
         sys.stdout.flush()
         parsedGSDoc = parse(path + '\\' + doc)
@@ -138,16 +145,14 @@ for doc in docs:
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     if len(entries) == 0:
                         #takes out nodes without text which are generated from section header MIMs
-                        print "CONTINUING"
+                        #print "CONTINUING"
                         continue
                     else:
                         gsDic[doc][entries] = value
         for k, v in gsDic[doc].items():
             gsDic[doc][k] = tuple(v)
             #print "gs dic: ", k, tuple(v)
-                        
-        # if the gold standard isn't perfect + has overlapping entries, it will be seen here but is not yet tested/fixed
-        # --> Create alert that funnels gs documents having overlapping MIMs and output at end of script
+
         
         ## Establishing the engine data structures
         engDic[doc] = {}
@@ -161,7 +166,7 @@ for doc in docs:
                     entries = tuple(sorted(str(binding) for binding in bindings if len(binding)>0))
                     value = [child.getAttribute('code') for child in entry.firstChild.childNodes if child.localName == 'code'] # added if filter here, because why would we need the manual validation codes? 
                     if len(entries) == 0:
-                        print "CONTINUING"
+                        #print "CONTINUING"
                         continue
                     elif entries in engDic[doc]:
                         engDic[doc][entries].append("".join(value))
@@ -238,7 +243,7 @@ for doc in docs:
         # Increments false positive count
         # Checks whether entries that exist in the engine exist in the gold standard
         # If not, it's a false positive
-        # NOTE: Doesn't include error checking. Basing it off the true positives' error checking
+        # Doesn't include error checking. Based it off the true positives' error checking
         for entry in engDic[doc]:
             # If value is in engine and not gs, increment
             if entry not in gsDic[doc]:
@@ -247,16 +252,6 @@ for doc in docs:
                     for code in engDic[doc][entry]:
                         fpDic[(code,)] += 1
                 else: fpDic[engDic[doc][entry]] += 1
-##                if "ENGINE_ONLY_FP" in errorDic[doc]:
-##                    print "x1 engine only entry in confMatrix, so now incrementing"
-##                    errorDic[doc]["ENGINE_ONLY_FP"][engDic[doc][entry]] += 1
-##                else:
-##                    #no engine only entry found for this dic in confmatrix, making a new dic
-##                    errorDic[doc]["ENGINE_ONLY_FP"] = {}
-##                    for value in matrixValues:
-##                        #initialize code from matrixValues to zero"
-##                        errorDic[doc]["ENGINE_ONLY_FP"][value] = 0
-##                    errorDic[doc]["ENGINE_ONLY_FP"][engDic[doc][entry]] += 1
             # Non-matching codes handling
             else:
                 #if the entry numbers exist in both but the engineDic has a multi-code entry (meaning, overlapping MIMs)
@@ -273,7 +268,7 @@ for doc in docs:
         # Increments false negative count
         # Checks whether entries that exist in the gold standard exist in the engine
         # If not, it's a false negative
-        # NOTE: Doesn't include error checking. Base it off the true positives' error checking
+        # Doesn't include error checking. Based off the true positives' error checking
         for entry in gsDic[doc]:
             if entry not in engDic[doc]:
                 fnDic[gsDic[doc][entry]] += 1
@@ -289,17 +284,6 @@ for doc in docs:
         gsDiffsEntries = gsDiffs.keys()
         engineDiffsEntries = engDiffs.keys()
         engDiffsEntries = engineDiffsEntries
-        
-        # GS Diffs = False negatives...             
-        # Get each gs diff entry (ede -- engine diff entry)
-##        for entry in gsDiffsEntries:
-##            # Get the key (a tuple) of each gold standard dic item
-##            for key in gsDic[doc].keys():
-##                # Convert each to a string for easy comparison
-##                strGDE = str(entry)
-##                strKey = str(key)
-##                if strGDE == strKey:
-                    #print("same")
         
         # Checking for overlap
         overlapsForKWIC[doc] = []
@@ -322,8 +306,6 @@ for doc in docs:
                             else:
                                 incompOverlaps[doc][gsKeyTup] = engKeyTup
                                 #overlapsForKWIC[doc].append([gsKeyTup, engKeyTup, set(gsKeyTup).intersection(engKeyTup)])
-        #print "complete overlap count: " + str(completeOverlaps)
-        #print "incomplete overlap count: " + str(incompleteOverlaps)
 
         #comparison of engine and gs entry tuples to sort out TP from FP overlaps based on criteria
         if incompOverlaps[doc]:
@@ -372,9 +354,6 @@ for doc in docs:
             
             truePosWithOverlaps[doc] = {}
             truePosWithOverlaps[doc] = dict(truePosFromOverlaps[doc].items() + truePositives[doc].items())
-
-            #sys.stdout.write("\rPercent: [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
-            #sys.stdout.flush()
             
         
         finalData = {}
@@ -478,9 +457,8 @@ for column in values:
     comparisonData = []
     fn = fnDic[column]
     comparisonData.extend([TElement('td', text=str(finalData[column][row]), attrib={'column':row[0]}) for row in values])
-    #print "fn ", fn, " for row ", row
     for tdElement in comparisonData:
-        tdElement.attrib['row'] = column[0] #[0] for getting the string inside the tuples 
+        tdElement.attrib['row'] = column[0]  
         if not 'style' in tdElement.attrib and tdElement.attrib['column'] == tdElement.attrib['row']:
             tp = int(tdElement.text)
             tdElement.attrib['style'] = "background: #00cd00; border: 1px solid #404040; color: yellow; font-weight:bold;"
@@ -491,23 +469,17 @@ for column in values:
             tdElement.text = None
         elif not 'style' in tdElement.attrib:
             tdElement.attrib['style'] = "background: white; color: #404040; border: 1px solid #404040"
-        #dataRow.extend(tdElement)
-    # print "out of loop, tabulated fp: " + str(fp)
     falseNegLinkage = TElement('td', attrib={'style':'background:#0962ac; color:#fff'})
     falseNegLinkage.append(TElement('a', text=str(fnDic[column]), attrib={'href':str(column[0])+'.xhtml', 'style':'font-weight:bold; color:#fff;'}))
     comparisonData.append(falseNegLinkage)
     comparisonData.append(TElement('td', text=str(sum(finalData[column][row] for row in values)), attrib={'style':'background:#0962ac; color: #fff'}))
     if tp != 0:
         # fscore
-        #print "fscore numerator: ", (2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
-        #print "fscore denominator: ", ((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))
         fscore = TElement('td', text=str((2*(float(int(tp))/float(float(int(tp)) + float(int(fp))))*(float(int(tp))/float(float(int(tp)) + float(int(fn)))))/((float(int(tp))/float(float(int(tp)) + float(int(fp))))+(float(int(tp))/float(float(int(tp)) + float(int(fn)))))), attrib={'style':'background:#0962ac; color: #fff'})
-        #print "fscore value: ", fscore.text
         comparisonData.append(fscore)
         # microrecall
         comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fn)))), attrib={'style':'background:#0962ac; color: #fff'})) # tp/tp+fn
         # microprecision
-        #print "dividing " + str(float(int(tp))) + " by " + str(float(int(tp)) + float(int(fp))) + " where there are %s fp's" % fp
         comparisonData.append(TElement('td', text=str(float(int(tp))/float(float(int(tp)) + float(int(fp)))), attrib={'style':'background:#0962ac; color: #fff'})) #tp/tp+fp
     elif tp == 0:
         comparisonData.append(TElement('td', text="N/A"))
@@ -524,7 +496,6 @@ for column in values:
     # Generating nested list of values to make column tabulations easier:
     listMatrix.append([finalData[column][row] for row in values])
         
-
 #Generating tds for tabulations of columns        
 ##engSumsTr = TElement('tr', parent=table)
 ##engSumsTh = TElement('th', text="Gs Sum", parent=engSumsTr, attrib={'style':'background:#0962ac;'})
@@ -564,34 +535,6 @@ for column in values:
         
 
 authorship = TElement('p', text="Email courtney.zelinsky@mmodal.com for questions / comments / suggestions for this script", parent=body)
-
-##tooltips = TElement('script', text="""
-##
-##
-##$(document).ready(function(){
-##    var text = "".concat($(this).attr('row'), " x ", $(this).attr('column'));
-##    $('td').attr('title', text);
-##    $('td').hover(function(){
-##        var title = $(this).attr('title');
-##        $(this)
-##        .data('tipText', title)
-##        .removeAttr('title');
-##        p = document.createElement('p');
-##        $('p').addClass('tooltip')
-##        .text(text)
-##        .appendTo('body')
-##        .fadeIn('fast');
-##    }, function() {
-##        $(this).attr('title', $(this).data('tipText'));
-##    }).mousemove(function(e) {
-##        var mousex = e.pageX + 20;
-##        var mousey = e.pageY + 10;
-##        $('.tooltip')
-##        .css({ top: mousey, left: mousex })
-##    });
-##});
-##""", parent=body)
-#tooltips.attrib['type'] = "text/javascript"
 
 #write matrix table to file
 with open(os.path.join(path, "confusionMatrix-Deid.html"), 'w') as outputFile:
@@ -647,14 +590,12 @@ for doc in diffsDic:
     wordDict = {}
     contents = parsedEngDoc.getElementsByTagName('content')
     gsContents = parsedGsDoc.getElementsByTagName('content')
-    #looks like a bunch of <DOM Element: content at 0x3396d50> etc instances for each content node in the doc
     entryTuples = [FPtuples for FPtuples in diffsDic[doc]['FP']]
     entryTuples.extend([FNtuples for FNtuples in diffsDic[doc]['FN']])
     for entry in entryTuples:
         if type(entry) != tuple:
             entryTuples.insert(entryTuples.index(entry),(entry,))
             entryTuples.remove(entry)
-    #all error entry tuples, looks like [('entry_60', 'entry_61'), ('entry_201', 'entry_202'), ('entry_185', 'entry_186'), ('entry_235', 'entry_236')...]
             
     for content in contents:
         for char in ['&', ';', '<', '>']:
@@ -664,9 +605,7 @@ for doc in diffsDic:
                 else:
                     wordDict[content.getAttribute('ID')] = content.firstChild.nodeValue
 
-    for i in range(len(wordDict)):
-        if 'entry_' + str(i) in wordDict:
-            outputParagraph.append(wordDict['entry_' + str(i)])
+    outputParagraph.extend([wordDict['entry_' + str(i)] for i in range(len(wordDict)) if 'entry_' + str(i) in wordDict])
 
     #Compare the errors (entryTuples) to the indexes in the outputParagraph to see which indexes need to be overwritten
     for entry in entryTuples:
@@ -808,7 +747,7 @@ for doc in diffsDic:
                     
             elif ('entry_' + str(i),) != entry and len(entry) > 1 and 'entry_' + str(i) == entry[0]:
                 # MULTI-ENTRY HANDLING e.g. ('entry_' + str(i),) is not equal to the entry, meaning that the entry + str(i) is occuring in a multi entry
-                
+
                 if entry in diffsDic[doc]['FP'].keys():
                     #if entry is a spontaneous multi-entry fp
                     if entry not in gsDic[doc].keys():
@@ -941,7 +880,6 @@ for doc in diffsDic:
                                 for key in overlapKeys:
                                     if 'entry_'+str(k) not in key:
                                         temp.append('<font style="background-color:blue;color:white;"><strong>' + wordDict['entry_' + str(k)] + '</strong></font>')
-                                        #then will need to add one to k? so as to balance
                                         break
                             elif 'entry_'+str(k) in wordDict:
                                 temp.append(wordDict['entry_' + str(k)])
@@ -950,8 +888,7 @@ for doc in diffsDic:
                         contexts[str(gsDic[doc][entry])][doc] = []
                     contexts[str(gsDic[doc][entry])][doc].append(''.join(temp))
                     #break
-                        #print "MULTI FN ENTRY GENERATED IN CONFUSION ", str(gsDic[doc][entry])
-                i += len(entry)
+            i += len(entry)
 
     output.append('<context doc="' + doc + '">' + "".join(outputParagraph) + '</context>')
 
@@ -961,6 +898,74 @@ allContexts = path + "allContexts.xhtml"
 with open(os.path.join(path, allContexts), 'w') as allContextsXML:
     allContextsXML.write(output)
 allContextsXML.close()
+
+with open(os.path.join(path, 'css.css'), 'w') as cssFile:
+    cssFile.write('''table {
+	border: 1px solid #ed6e00;
+	padding: 10px;
+	font-size: 12px;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	display: block;
+	table-layout: fixed;
+	width: 100%;
+}
+
+.ellipsable{
+	white-space: nowrap;
+}
+	
+th, h3{
+	background: #ed6e00;
+	color:white;
+	padding: 5px;
+}
+
+td {
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	padding: 7px;
+	display: block;
+	width: 100px;
+	
+}
+	
+th{
+	font-size: 13px;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+	padding: 7px;
+}
+
+#KWIC {
+	font-size: 14px;
+}
+
+body {
+	font-family:Tahoma, Geneva, sans-serif;
+	font-size: 14px;
+	color:#404040;
+	background: #fff;
+}
+
+.blank{
+	background: #fff;
+}
+
+.tooltip {
+	display:none;
+	position:absolute;
+	border:1px solid #333;
+	background-color:#161616;
+	border-radius:5px;
+	padding:10px;
+	color:#fff;
+	font-size:12px Arial;
+}
+''')
+cssFile.close()
 
 #reparsing the output so as to proceed to add it to a final xhtml format:
 finalOutput = ET.parse(allContexts, parser=parser)
@@ -1025,7 +1030,9 @@ for column in values:
         
         #Body
         body = Doc.createElement('body')
+        
         h1 = Doc.createElement('h1')
+        
         h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)))
         h1.appendChild(h1Text)
         
@@ -1066,26 +1073,12 @@ for column in values:
 
         if str(column) in contexts:
             for docName, snippets in contexts[str(column)].items():
-                contextNode = Doc.createElement('ul')
-                docNode = Doc.createElement('h3')
-                docText = Doc.createTextNode(docName)
-                docNode.appendChild(docText)
-                contextNode.appendChild(docNode)
-                for snippet in snippets:
-                    for char in ['&', '; ', ' < ', ' > ', '<INC']:
-                        while char in snippet:
-                            snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
-                        snippetClean = "<p>" + snippet + "</p>"
-                    parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                    finalSnippet = parsedSnippet.firstChild
-                    contextNode.appendChild(finalSnippet)
-                contextsTable.appendChild(contextNode)
+                appendKWIC()
 
             body.appendChild(contextsTable)
             rootTemp.appendChild(body)
             Doc.appendChild(rootTemp)
             f = re.sub('[(),u\']', '', str(column)) + ".xhtml"
-            #f = re.sub('[(),u\']', '', str(column)) + "x" + re.sub('[(),u\']', '', str(row)) + ".xhtml"
             with open(os.path.join(path, f), 'w') as output:
                 output.write(Doc.toxml())
             output.close()
@@ -1125,6 +1118,7 @@ for column in values:
             
             #Body
             body = Doc.createElement('body')
+            
             h1 = Doc.createElement('h1')
             h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " mistaken for " + re.sub('[(),u\']', '', str(row)))
             h1.appendChild(h1Text)
@@ -1151,20 +1145,7 @@ for column in values:
 
             if str(column)+str(row) in contexts:    
                 for docName, snippets in contexts[str(column)+str(row)].items():
-                    contextNode = Doc.createElement('ul')
-                    docNode = Doc.createElement('h3')
-                    docText = Doc.createTextNode(docName)
-                    docNode.appendChild(docText)
-                    contextNode.appendChild(docNode)
-                    for snippet in snippets:
-                        for char in ['&', '; ', ' < ', ' > ', '<INC']:
-                            while char in snippet:
-                                snippet = "<p>" + re.sub(char, "", snippet)+ "</p>"
-                            snippetClean = "<p>" + snippet + "</p>"
-                        parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                        finalSnippet = parsedSnippet.firstChild
-                        contextNode.appendChild(finalSnippet)
-                    contextsTable.appendChild(contextNode)
+                    appendKWIC()
                         
             body.appendChild(contextsTable)
             rootTemp.appendChild(body)
@@ -1180,7 +1161,6 @@ for column in values:
     for row in values:
         if finalData[column][row] > 0 and column != row:
         #if the stat is non-zero and not a true positive               
-            #print "column: ", column, " row: ", row
             Doc = minidom.Document()
             rootTemp = Doc.createElement('html')
             rootTemp.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml')
@@ -1210,6 +1190,7 @@ for column in values:
             
             #Body
             body = Doc.createElement('body')
+            
             h1 = Doc.createElement('h1')
             h1Text = Doc.createTextNode(re.sub('[(),u\']', '', str(column)) + " (Spontaneous)")
             h1.appendChild(h1Text)
@@ -1236,20 +1217,7 @@ for column in values:
             
             if str(column)+"ONLY" in contexts:
                 for docName, snippets in contexts[str(column)+"ONLY"].items():
-                    contextNode = Doc.createElement('ul')
-                    docNode = Doc.createElement('h3')
-                    docText = Doc.createTextNode(docName)
-                    docNode.appendChild(docText)
-                    contextNode.appendChild(docNode)
-                    for snippet in snippets:
-                        for char in ['&', '; ', ' < ', ' > ', '<INC']:
-                            while char in snippet:
-                                snippet = "<p>" + re.sub(char, "", snippet) + "</p>"
-                            snippetClean = "<p>" + snippet + "</p>"
-                        parsedSnippet = minidom.parseString(snippetClean.encode('utf-8'))
-                        finalSnippet = parsedSnippet.firstChild
-                        contextNode.appendChild(finalSnippet)
-                    contextsTable.appendChild(contextNode)
+                    appendKWIC()
 
             body.appendChild(contextsTable)
             rootTemp.appendChild(body)
