@@ -92,10 +92,12 @@ def mims_to_dicts(goldDocs):
 
 
     for doc in goldDocs:
+        # First process the gold standard
         mode = "gs"
         goldEntries = parse(os.path.join(path, doc)).getElementsByTagName('entry')
         process_entries(goldEntries)
 
+        # Then process the engine counterpart
         mode = "eng"
         engEntries = parse(os.path.join(path, find_pair(doc))).getElementsByTagName('entry')
         process_entries(engEntries)
@@ -112,15 +114,13 @@ goldDocs = filter(lambda x: str(x.split('.')[len(x.split('.'))-2]) != 'out', os.
 
 mims_to_dicts(goldDocs)
 
-gsData = pandas.DataFrame(gsList)
-engData = pandas.DataFrame(engList)
+truePos =
 
-print gsData
-print "\n\n\n"
-print engData
+# gsData = pandas.DataFrame(gsList)
+# engData = pandas.DataFrame(engList)
 
-gsData.to_csv('gsData.csv', sep="\t")
-engData.to_csv('engData.csv', sep="\t")
+# gsData.to_csv('gsData.csv', sep="\t")
+# engData.to_csv('engData.csv', sep="\t")
 
 truePos = gsData.reindex(gsData.index.intersection(engData.index))
 
