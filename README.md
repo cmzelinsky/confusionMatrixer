@@ -1,4 +1,4 @@
 deidConfusionMatrixer
 =====================
 
-A work script for taking deidentification engine stats
+A script for taking engine stats
