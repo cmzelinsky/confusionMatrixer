@@ -13,21 +13,20 @@
 # 2) False positives to be displayed in the confusion matrix can only come from mims
 #    identified as having at least comprobable scoping but a mismatched label.
 
-
-import os, datetime, sys, re
-#import timeit
+from __future__ import division
+import os, datetime, sys, re, codecs
+import sqlite3, csv
 import pandas
 #import numpy
 from xml.dom.minidom import parse
-import xml.dom.minidom as minidom
-#import xml.etree.ElementTree as ET
-#from lxml import etree
+from lxml import etree
 
 startTime = datetime.datetime.now()
 print startTime
 
 # path = sys.argv[1]
 path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTestingSub"
+#
 
 #modifierType = sys.argv[2]
 modifierType = 'T'
@@ -55,6 +54,8 @@ labels = {
         "i2b2":[u'NEGATED'],
         }
 
+texts = {}
+
 gsRows = {}
 gsList = []
 engList = []
@@ -63,27 +64,13 @@ truePos = []
 falsePos = []
 overlaps = []
 
+# db = sqlite3.connect('confusionData.db')
+# confusionDataDb = db.cursor()
+
+
 matrix = pandas.DataFrame(index=labels[modifierType], columns=labels[modifierType])
 matrix = matrix.fillna(0)
 
-##
-## Classes
-##
-
-class TElement(ET._Element):
-    """
-    Extending elementtree's Element class so as to accommodate text
-    """
-    def __init__(self, tag, style=None, text=None, tail=None, parent=None, attrib={}, **extra):
-        ET._Element.__init__(self, tag, dict(attrib, **extra))
-        if text:
-            self.text = text
-        if tail:
-            self.tail = tail
-        if style:
-            self.style = style
-        if parent is not None:
-            parent.append(self)
 
 ##
 ## Functions
@@ -97,7 +84,7 @@ def find_pair(fname):
     return fname[:-3] + 'out.xml'
 
 
-def get_tp_fp(gsList, engList):
+def get_tp_fp_html(gsList, engList):
 
     for gsRow in gsList:
         engListByDoc = filter(lambda x: x['Document'] == gsRow['Document'], engList)
@@ -107,25 +94,61 @@ def get_tp_fp(gsList, engList):
             j = 0
             found = False
             while j < len(engListByDoc) and not found:
+                document = engListByDoc[j]['Document']
+                print document
+                label = engListByDoc[j]['Label']
+                engEntries = sorted(list(engListByDoc[j]['Entries']))
                 # If the "middle" token (the list[len(list)/2] token) from a gold entries list is in the engine tokens' entries, it's an overlap
-                # A bit more isolated of a search:
-                if ((gsRow['Entries'][0] or gsRow['Entries'][-1]) in engListByDoc[j]['Entries']) and engListByDoc[j]['Document'] == gsRow['Document'] and engListByDoc[j]['Label'] == gsRow['Label']:
-                #if gsRow['Entries'][len(gsRow['Entries'])/2] in engRow['Entries'] and engRow['Document'] == gsRow['Document']:
-                    #print "overlapping tp pair: ", gsRow, engList[j]
-                    found = True
-                    truePos.append({'Document': engListByDoc[j]['Document'], 'engEntries': list(engListByDoc[j]['Entries']), 'Label': engListByDoc[j]['Label']})
-                else: #False Positives
-                    # Mim is a label mismatch, but scope is good -- goes to confMatrix
-                    if ((gsRow['Entries'][0] or gsRow['Entries'][-1]) in engListByDoc[j]['Entries']) and engListByDoc[j]['Document'] == gsRow['Document'] and engListByDoc[j]['Label'] != gsRow['Label']:
+                if ((gsRow['Entries'][0] or gsRow['Entries'][-1]) in engEntries) and document == gsRow['Document']:
+                    # Mim has overlap and matches label -- goes to confMatrix
+                    if label == gsRow['Label']:
                         found = True
-                        falsePos.append({'Document': engListByDoc[j]['Document'], 'gsEntries': list(gsRow['Entries']), 'engEntries': list(engListByDoc[j]['Entries']), 'gsLabel': gsRow['Label'], 'engLabel': engListByDoc[j]['Label']})
+                        truePos.append({'Document': document,\
+                                        'engEntries': engEntries,\
+                                        'Label': label,})
+                                        #'context': texts[document]})
+                    # Mim has overlap and is a label mismatch -- goes to confMatrix
+                    elif label != gsRow['Label']:
+                        found = True
+                        gsEntries = gsRow['Entries']
+                        gsLabel = gsRow['Label']
+                        falsePos.append({'Document': document,\
+                                         'gsEntries': gsEntries, \
+                                         'engEntries': engEntries,\
+                                         'gsLabel': gsLabel, \
+                                         'engLabel': label})
+                                         # 'context': texts[document]})
+                        outHtml = gsLabel + "_x_" + label + ".html"
+                        with codecs.open(os.path.join(path, outHtml), 'a', 'utf-8') as outDoc:
+                            content = texts[document][:engEntries[0]] + '<font style="background-color:yellow;"><strong>'.split() + texts[document][engEntries[0]:engEntries[-1]] + '</strong></font>'.split() + texts[document][engEntries[-1]:]
+                            #content = content[:gsEntries[0]] + '<font style="background-color:green;><strong>'.split() + content[gsEntries[0]:gsEntries[-1]] + '</strong></font>'.split() + content[gsEntries[-1]:]
+                            if outHtml not in os.listdir(path):
+                                outDoc.write("""
+                                <html>
+                                    <head>
+                                        <title>""" + gsLabel + """ confusions as """ + label + """</title>
+                                    </head>
+                                    <body>
+                                        <h1>""" + gsLabel + """ confusions as """ + label + """ </h1>
+                                            <table>
+                                                <tr>
+                                                    <th>""" + document + """</th>
+                                                    <td>""" + ' '.join(content) + """</td>
+                                                </tr>
+                                """)
+                            else:
+                                outDoc.write("""
+                                <tr>
+                                    <th>""" + document + """</th>
+                                    <td>""" + ' '.join(content) + """</td>
+                                </tr>""")
+
                     # MIM not in gold standard at all -- garbage produced by engine
                     # elif ((gsRow['Entries'][0] or gsRow['Entries][-1]']) not in engListByDoc[j]['Entries']) and engListByDoc[j]['Document'] == gsRow['Document']:
                     #    falsePos.append({'Document': engListByDoc[j]['Document'], 'engEntries': list(engListByDoc[j]['Entries']), 'engLabel': engListByDoc[j]['Label']})
                 j+=1
 
-
-def mims_to_dicts(goldDocs, remapping):
+def mims_and_text_to_dicts(goldDocs, remapping):
     """Establish gold standard data structures
 
     Maps tokens-to-label mapping to the respective document
@@ -139,19 +162,24 @@ def mims_to_dicts(goldDocs, remapping):
         mimChildren = []
 
         for entry in entries:
-            mimChildren.append(entry.firstChild)
+            if entry.firstChild.localName != 'scope':
+                print entry.firstChild.localName
+                continue
+            else:
+                mimChildren.append(entry.firstChild)
 
         for child in mimChildren:
             bindings = child.getElementsByTagNameNS('*', 'narrativeBinding')
-            entries = sorted(binding.getAttribute('ref').split('_')[1] for binding in bindings)
+            entries = sorted(int(binding.getAttribute('ref').split('_')[1]) for binding in bindings)
             codeLabels = child.getElementsByTagNameNS('*', 'code')
             label = [child.getAttribute('code') for child in codeLabels if child.getAttribute('code') != '\\' and child.getAttribute('displayName') != "Lifelong"]
+            label = label[0]
             if mode == 'gs' and len(entries) > 0:
                 if remapping is True:
-                    if label == [u'RECENTPAST']:
-                        gsList.append({'Document': doc, 'Entries': entries, 'Label': [u'PAST']})
-                    elif label == [u'FUTURE']:
-                        gsList.append({'Document':doc, 'Entries': entries, 'Label': [u'PRESENT']})
+                    if label == 'RECENTPAST':
+                        gsList.append({'Document': doc, 'Entries': entries, 'Label': 'PAST'})
+                    elif label == 'FUTURE':
+                        gsList.append({'Document':doc, 'Entries': entries, 'Label': 'PRESENT'})
                     else:
                         gsList.append({'Document': doc, 'Entries': entries, 'Label': label})
                 else:
@@ -163,9 +191,11 @@ def mims_to_dicts(goldDocs, remapping):
 
 
     for doc in goldDocs:
+        goldParsed = parse(os.path.join(path, doc))
+        texts[doc] = [contentNode.firstChild.nodeValue for contentNode in goldParsed.getElementsByTagName('content')]
+
         mode = "gs"
-        goldEntries = parse(os.path.join(path, doc)).getElementsByTagName('entry')
-        process_entries(goldEntries)
+        process_entries(goldParsed.getElementsByTagName('entry'))
 
         mode = "eng"
         engEntries = parse(os.path.join(path, find_pair(doc))).getElementsByTagName('entry')
@@ -194,84 +224,93 @@ def data_to_matrix(tp, fp):
         matrix.loc[row['gsLabel'], row['engLabel']] += 1
 
 
+def finish_htmls():
+    for html in filter(lambda x: str(x.split('.')[len(x.split('.'))-1]) == 'html', os.listdir(path)):
+        with codecs.open(os.path.join(path, html), 'w', 'utf-8') as out:
+            out.write("""</table></body></html>""")
+        out.close()
+
 #######################################################################################################################
 
 print "Start time: ", startTime
 
 # gsList and engList = lists of "dictionary-rows" used to create base dataframes
 
-goldDocs = filter(lambda x: str(x.split('.')[len(x.split('.'))-2]) != 'out', os.listdir(path))
+goldDocs = filter(lambda x: str(x.split('.')[len(x.split('.'))-2]) != 'out' and str(x.split('.')[len(x.split('.'))-1]) == 'xml', os.listdir(path))
 
 # Turn on or off remapping to map gold only categories like "RECENTPAST" and "FUTURE" to "PAST" and "PRESENT" respectively
-mims_to_dicts(goldDocs, remapping=False)
+mims_and_text_to_dicts(goldDocs, remapping=True)
 
-print "gsList: ", gsList[:5]
-print "engList: ", engList[:5]
+print "gsList: ", gsList[:3]
+print "engList: ", engList[:3]
 
-get_tp_fp(gsList, engList)
+get_tp_fp_html(gsList, engList)
+#finish_htmls()
 
 allMims = gsList.extend(engList)
 
-gsTups = [tuple(r.items()) for r in gsList]
-engTups = [tuple(r.items()) for r in engList]
-
-
-# Base DataFrames
-# gsData = pandas.DataFrame(gsList)
-# engData = pandas.DataFrame(engList)
-# allData = pandas.DataFrame(allMims)
-
 # True Positives
-
-# --Complete Overlaps
-# More useful to engines like Deid, in which the scoping between gold and engine mims is the exact same much more often.
-# Not so much for Temporality, for instance.
-truePosTups = []
-for row in gsTups:
-    i = 0
-    found = False
-    while i < len(engTups) and not found:
-        if row == engTups[i]:
-            found = True
-            truePosTups.append(row)
-        else:
-            i+=1
-
-# --1-token Overlaps
-#print "Overlaps: ", overlaps
-o = pandas.DataFrame(overlaps)
-#print "\n\nOverlaps\n", o
 
 # True Positive Total:
 print "truePos: ", truePos[:10]
 #print "truePos: ", truePos
-tpData = pandas.DataFrame(truePos)
+#tpData = pandas.DataFrame(truePos)
 #print "\n\n[True Positive Data]\n", tpData
 
 # False Negatives
 falseNeg = [dataRow for dataRow in gsList if dataRow not in engList]
-fnData = pandas.DataFrame(falseNeg)
-#print "\n\n[False Negative Data]\n", fnData
+#fnData = pandas.DataFrame(falseNeg)
+print "\n\n[False Negative Data]\n", falseNeg[:5]
+print "total FNs: ", len(falseNeg)
 
 # False Positives
 # FalsePositives = FalsePositives - PartialOverlaps
-print falsePos
-fpData = pandas.DataFrame(falsePos)
-print "\n\n[False Positive Data]\n", fpData
-fpData.to_csv('fp.csv', sep="\t")
+#fpData = pandas.DataFrame(falsePos)
+print "\n\n[False Positive Data]\n", falsePos[:5]
+print "total FPs: ", len(falsePos)
+#fpData.to_csv('fp.csv', sep="\t")
 
 data_to_matrix(truePos, falsePos)
 
 print "\n\n", "v Gold\t\t> Engine\n", matrix
 
-# print "Initializing dicts: ", timeit.timeit("initialize_dicts()", setup="from __main__ import initialize_dicts")
-# timeit -- 801.550652967 on full temporalityTesting set with confMatrix init
-
-# print  "Mims to dicts: ", timeit.timeit("mims_to_dict()", setup="from __main__ import mims_to_dict")
-
+print '\n\nPrecision (TP/TP+FP): ', len(truePos)/(len(truePos)+len(falsePos))
+print 'Recall (TP/TP+FN): ',  len(truePos)/(len(truePos)+len(falseNeg))
 
 print "\n\nTook ", datetime.datetime.now()-startTime, " to run ", len(goldDocs), " files."
 #print len(gsData.index), " mims in gold data"
 print len(gsList), " mims in gold data"
 #print len(engData.index), " mims in engine data"
 print len(engList), " mims in eng data"
+
+
+################################################################# Junk
+
+# Base DataFrames
+# gsData = pandas.DataFrame(gsList)
+# engData = pandas.DataFrame(engList)
+# allData = pandas.DataFrame(allMims)
+
+# confusionDataDb.execute("CREATE TABLE fp (document, gsEntries, engEntries, gsLabel, engLabel;")
+# with open('fp.csv', 'rb') as fpCSV:
+#     dictReader = csv.DictReader(fpCSV)
+#     toDb = [(i['document'], i['gsEntries'], i['engEntries'], i['gsLabel'], i['engLabel']) for i in dictReader]
+#
+# confusionDataDb.executemany("INSERT INTO fp (document, gsEntries, engEntries, gsLabel, engLabel) VALUES (?, ?, ?, ?, ?);", toDb)
+# db.commit()
+
+# --Complete Overlaps
+# More useful to engines like Deid, in which the scoping between gold and engine mims is the exact same much more often.
+# Not so much for Temporality, for instance.
+# gsTups = [tuple(r.items()) for r in gsList]
+# engTups = [tuple(r.items()) for r in engList]
+# truePosTups = []
+# for row in gsTups:
+#     i = 0
+#     found = False
+#     while i < len(engTups) and not found:
+#         if row == engTups[i]:
+#             found = True
+#             truePosTups.append(row)
+#         else:
+#             i+=1
