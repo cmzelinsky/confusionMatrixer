@@ -379,17 +379,13 @@ if any(mismatchFp):
             if engGoldMatch[0] < engGoldMatch[1]:
                 #gold happens first
                 begIx = engGoldMatch[0]
-                colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:engGoldMatch[0]] + \
-                                    ['<font style="background-color:blue;color:white;">'] + \
-                                    mismatchFp[doc][k].gsTokens[engGoldMatch[0]:engGoldMatch[0]+engGoldMatch[2]] + ['</font>'] + \
-                                    mismatchFp[doc][k].gsTokens[engGoldMatch[0]+engGoldMatch[2]+1:]
             elif engGoldMatch[1] < engGoldMatch[0]:
                 #engine happens first
                 begIx = engGoldMatch[1]
-                colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:engGoldMatch[0]] + \
-                                    ['<font style="background-color:purple;color:white;">'] + \
-                                    mismatchFp[doc][k].gsTokens[engGoldMatch[0]:engGoldMatch[0]+engGoldMatch[2]] + ['</font>'] + \
-                                    mismatchFp[doc][k].gsTokens[engGoldMatch[0]+engGoldMatch[2]+1:]
+            colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:begIx] + \
+                                ['<font style="background-color:blue;color:white;">'] + \
+                                mismatchFp[doc][k].gsTokens[begIx:begIx+engGoldMatch[2]] + ['</font>'] + \
+                                mismatchFp[doc][k].gsTokens[begIx+engGoldMatch[2]+1:]
             #colorCodedContext = '<font style="background-color:purple;color:white;"><strong>' + ''.join(mismatchFp[doc][k].context) + '</strong></font>'
             contextOut.append('<td>' + ''.join(colorCodedGsContext) + '</td>')
             contextOut.append('<td>' + ''.join(colorCodedEngContext) + '</td>')
