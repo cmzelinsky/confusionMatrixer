@@ -12,19 +12,23 @@ from IPython.display import HTML
 ##
 ## Confusion Matrixer for Modifiers and Deid... v2
 ##
+## - Tested on Python 2.7
 ## - Document tokenization with gaps now handled
 ## - Much quicker on huge sets (tested up to 1000 gold + 1000 eng docs)
 ## - Mim overlap is hinged on a phrase similarity ratio, adjustable around line 270
-## - Tested on Temporality, ...
+## - Tested on Temporality, ... should hypothetically work with any engine,
+##      just need to catch the respective mim type (ln 3 of process_entries())
 
 startTime = datetime.datetime.now()
 print startTime
 
 # path = sys.argv[1]
-path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTestingSub"
+# path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTestingSub"
+path = "C:\\Users\\courtney.zelinsky\\Desktop\\chapmanCorpus"
 
 #modifierType = sys.argv[2]
-modifierType = 'T'
+#modifierType = 'T'
+modifierType = 'i2b2'
 
 if not os.path.exists(path):
     raise Exception('Invalid path(s)')
@@ -55,7 +59,7 @@ remapping = True
 
 Mim = namedtuple("Mim", "entries, tokens, label")
 mismatchMim = namedtuple("mismatchMim", "doc, gsEntries, engEntries, gsTokens, engTokens, gsLabel, engLabel, context")
-fnMim = namedtuple("fnMim", "entries, tokens, gsLabel, context")
+fnMim = namedtuple("fnMim", "doc, entries, tokens, gsLabel, context")
 
 labels = {
         "S":[u'SUBJECT', u'PROVIDER', u'AUTHOR', u'BABY', u'NONFAMILY', u'FAMILY', u'SIBLING', u'MOTHER', u'FATHER',\
@@ -67,7 +71,7 @@ labels = {
           u'CERTIFICATE_OR_LICENSE_NUMBER', u'ID_OR_CODE_NUMBER', u'NAME', u'ORGANIZATION', u'URL', u'E_MAIL_ADDRESS',\
           u'TIME', u'OTHER', u'HOSPITAL', u'INITIAL', u'HOSPITAL_SUB'],
         "T": [u'PAST', u'RECENTPAST', u'FUTURE', u'PRESENT', u'UNDEFINED'],
-        "i2b2":[u'NEGATED'],
+        "i2b2":[u'NEGATIVE'],
         }
 
 labelsTup = [(label1, label2) for label1 in labels[modifierType] for label2 in labels[modifierType]]
@@ -91,7 +95,7 @@ def merge_sequences_get_context(gsEntries, engEntries, doc):
     sm = difflib.SequenceMatcher(a=gsEntries,b=engEntries)
     res = []
     for (op, gsStart, gsEnd, engStart, engEnd) in sm.get_opcodes():
-        if op == 'equal' or op=='delete':
+        if op == 'equal' or op == 'delete':
             #Range appears in both sequences, or only in the first one.
             res += gsEntries[gsStart:gsEnd]
         elif op == 'insert':
@@ -217,16 +221,16 @@ def process_entries(entries):
 def data_to_matrix(tp, fp, fn):
 
     # Add true positive and mismatch data to matrix
-    for mim in tp:
-        matrix.loc[mim.label, mim.label] += 1
+    for m in tp:
+        matrix.loc[m.label, m.label] += 1
 
-    for mim in fp:
-        matrix.loc[mim.gsLabel, mim.engLabel] += 1
+    for m in fp:
+        matrix.loc[m.gsLabel, m.engLabel] += 1
 
     matrix['totals'] = matrix.sum(axis=1)
 
-    for mim in fn:
-        matrix.loc[mim.gslabel, 'fn'] += 1
+    for m in fn:
+        matrix.loc[m.gsLabel, 'fn'] += 1
 
     matrix['tp'] = numpy.diag(matrix)
 
@@ -267,7 +271,7 @@ for doc in goldDocs:
                 falseNeg[doc] = []
             contextRange = range(match.entries[0]-10,match.entries[0]) + \
                            match.entries+range(match.entries[-1],match.entries[-1]+10)
-            temp = fnMim(match.entries, match.tokens, match.label,\
+            temp = fnMim(doc, match.entries, match.tokens, match.label,\
                          [re.sub(r'\n', ' ', texts[doc][i]) for i in contextRange if i in set(texts[doc].keys())])
             falseNeg[doc].append(temp)
         elif type(match) == int:
@@ -325,7 +329,6 @@ print "\n\n\n"
 
 [tpFlat.extend(truePos[doc]) for doc in truePos]
 [fnFlat.extend(falseNeg[doc]) for doc in falseNeg]
-print "FNFLAT: ", fnFlat
 [mismatchFlat.extend(mismatchFp[doc]) for doc in mismatchFp]
 
 labelCombos = [label1+label2 for label1 in labels[modifierType] for label2 in labels[modifierType]]
@@ -345,102 +348,99 @@ matrix = matrix.fillna(0)
 ##
 
 contextOut = ['<html><head></head><body><table>']
-if any(mismatchFp):
-    for doc in mismatchFp:
+if any(mismatchFlat):
+    for mim in mismatchFlat:
         k = 0
         contextOut.append('<tr>')
         #for each mim per doc
-        for k in xrange(len(mismatchFp[doc])):
-            contextOut.append('<th>' + doc + '</th>')
-            contextOut.append('<th>' + mismatchFp[doc][k].gsLabel + " confused as " + mismatchFp[doc][k].engLabel + '</th>')
-            goldMatch = difflib.SequenceMatcher(None, mismatchFp[doc][k].context, \
-                                                mismatchFp[doc][k].gsTokens).get_matching_blocks()[0]
-            engMatch = difflib.SequenceMatcher(None, mismatchFp[doc][k].context, \
-                                               mismatchFp[doc][k].engTokens).get_matching_blocks()[0]
-            #engGoldMatch = difflib.SequenceMatcher(None,
-            # mismatchFp[doc][k].gsTokens, mismatchFp[doc][k].engTokens).get_matching_blocks()[0]
-            justEng = set(mismatchFp[doc][k].engEntries) - set(mismatchFp[doc][k].gsEntries)
-            justGs = set(mismatchFp[doc][k].gsEntries) - set(mismatchFp[doc][k].engEntries)
-            intrscEngGs = set(mismatchFp[doc][k].gsEntries) & set(mismatchFp[doc][k].engEntries)
+        contextOut.append('<th>' + mim.doc + '</th>')
+        contextOut.append('<th>' + mim.gsLabel + " confused as " + mim.engLabel + '</th>')
+        goldMatch = difflib.SequenceMatcher(None, mim.context, mim.gsTokens).get_matching_blocks()[0]
+        engMatch = difflib.SequenceMatcher(None, mim.context, mim.engTokens).get_matching_blocks()[0]
+        #engGoldMatch = difflib.SequenceMatcher(None,
+        # mismatchFp[doc][k].gsTokens, mismatchFp[doc][k].engTokens).get_matching_blocks()[0]
+        justEng = set(mim.engEntries) - set(mim.gsEntries)
+        justGs = set(mim.gsEntries) - set(mim.engEntries)
+        intrscEngGs = set(mim.gsEntries) & set(mim.engEntries)
 
-            if justGs and justEng:
-                if mismatchFp[doc][k].gsEntries[0] < mismatchFp[doc][k].engEntries[0]:
-                    #gold happens first
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:goldMatch[0]]) + \
-                                        '<font style="background-color:blue;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justGs))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:red;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justEng))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-                elif mismatchFp[doc][k].gsEntries[0] > mismatchFp[doc][k].engEntries[0]:
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:red;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justEng))]) +\
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justGs))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-            if justGs and not justEng:
-                if mismatchFp[doc][k].gsEntries[0] < mismatchFp[doc][k].engEntries[0]:
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:goldMatch[0]]) + \
-                                        '<font style="background-color:blue;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justGs))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-                elif mismatchFp[doc][k].gsEntries[0] > mismatchFp[doc][k].engEntries[0]:
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:purple;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justGs))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-            elif justEng and not justGs:
-                if mismatchFp[doc][k].gsEntries[0] < mismatchFp[doc][k].engEntries[0]:
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:goldMatch[0]]) + \
-                                        '<font style="background-color:purple;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:red;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justEng))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-                elif mismatchFp[doc][k].gsEntries[0] > mismatchFp[doc][k].engEntries[0]:
-                    colorCodedContext = ''.join(mismatchFp[doc][k].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:red;color:white;"><strong>' + \
-                                        ''.join([texts[doc][i] for i in sorted(list(justEng))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
-                                        ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font>' + \
-                                        ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-
-            elif not justEng and not justGs:
-                colorCodedContext = ''.join(mismatchFp[doc][k].context[0:goldMatch[0]]) + \
-                                    '<font style="background-color:purple;color:white;"><strong>' + \
-                                    ''.join([texts[doc][i] for i in sorted(list(intrscEngGs))]) + \
+        if justGs and justEng:
+            if mim.gsEntries[0] < mim.engEntries[0]:
+                #gold happens first
+                colorCodedContext = ''.join(mim.context[0:goldMatch[0]]) + \
+                                    '<font style="background-color:blue;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justGs))]) + \
+                                    '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font><font style="background-color:red;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justEng))]) + \
                                     '</strong></font>' + \
-                                    ''.join(mismatchFp[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
 
-            # colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:begIx] + \
-            #                     ['<font style="background-color:blue;color:white;">'] + \
-            #                     mismatchFp[doc][k].gsTokens[begIx:begIx+engGoldMatch[2]] + ['</font>'] + \
-            #                     mismatchFp[doc][k].gsTokens[begIx+engGoldMatch[2]+1:]
+            elif mim.gsEntries[0] > mim.engEntries[0]:
+                colorCodedContext = ''.join(mim.context[0:engMatch[0]]) + \
+                                    '<font style="background-color:red;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justEng))]) +\
+                                    '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justGs))]) + \
+                                    '</strong></font>' + \
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
 
-            contextOut.append('<td>' + ''.join(colorCodedContext) + '</td>')
-            #contextOut.append('<td>' + ''.join(colorCodedGsContext) + '</td>')
-            #contextOut.append('<td>' + ''.join(colorCodedEngContext) + '</td>')
-            #contextOut.append('<td>' + ''.join(colorCodedOutContext) + '</td>')
+        if justGs and not justEng:
+            if mim.gsEntries[0] < mim.engEntries[0]:
+                colorCodedContext = ''.join(mim.context[0:goldMatch[0]]) + \
+                                    '<font style="background-color:blue;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justGs))]) + \
+                                    '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font>' + \
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
+
+            elif mim.gsEntries[0] > mim.engEntries[0]:
+                colorCodedContext = ''.join(mim.context[0:engMatch[0]]) + \
+                                    '<font style="background-color:purple;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justGs))]) + \
+                                    '</strong></font>' + \
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
+
+        elif justEng and not justGs:
+            if mim.gsEntries[0] < mim.engEntries[0]:
+                colorCodedContext = ''.join(mim.context[0:goldMatch[0]]) + \
+                                    '<font style="background-color:purple;color:white;"><strong>' + \
+                                    ''.join([texts[mim.oc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font><font style="background-color:red;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justEng))]) + \
+                                    '</strong></font>' + \
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
+
+            elif mim.gsEntries[0] > mim.engEntries[0]:
+                colorCodedContext = ''.join(mim.context[0:engMatch[0]]) + \
+                                    '<font style="background-color:red;color:white;"><strong>' + \
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(justEng))]) + \
+                                    '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
+                                    ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                    '</strong></font>' + \
+                                    ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
+
+        elif not justEng and not justGs:
+            colorCodedContext = ''.join(mim.context[0:goldMatch[0]]) + \
+                                '<font style="background-color:purple;color:white;"><strong>' + \
+                                ''.join([texts[mim.doc][i] for i in sorted(list(intrscEngGs))]) + \
+                                '</strong></font>' + \
+                                ''.join(mim.context[goldMatch[0]+goldMatch[2]+1:])
+
+        # colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:begIx] + \
+        #                     ['<font style="background-color:blue;color:white;">'] + \
+        #                     mismatchFp[doc][k].gsTokens[begIx:begIx+engGoldMatch[2]] + ['</font>'] + \
+        #                     mismatchFp[doc][k].gsTokens[begIx+engGoldMatch[2]+1:]
+
+        contextOut.append('<td>' + ''.join(colorCodedContext) + '</td>')
+        #contextOut.append('<td>' + ''.join(colorCodedGsContext) + '</td>')
+        #contextOut.append('<td>' + ''.join(colorCodedEngContext) + '</td>')
+        #contextOut.append('<td>' + ''.join(colorCodedOutContext) + '</td>')
         contextOut.append('</tr>')
     contextOut.append('</table></body></html>')
 else:
@@ -448,24 +448,31 @@ else:
 
 contextOut = ''.join(contextOut)
 
-fnContext = ['<html><head></head><body><table>']
-if any(falseNeg):
-    for doc in falseNeg:
-        k = 0
-        fnContext.append('<tr>')
-        #for each mim per doc
-        for k in xrange(len(falseNeg[doc])):
-            fnContext.append('<th>' + doc + '</th>')
-            fnContext.append('<th>' + falseNeg[doc][k].label + " wasn't caught </th>")
-            goldMatch = difflib.SequenceMatcher(None, falseNeg[doc][k].context,\
-                                                falseNeg[doc][k].tokens).get_matching_blocks()[0]
-            fnColorCoded = ''.join(falseNeg[doc][k].context[0:goldMatch[0]]) + \
-                 '<font style="background-color:yellow"><strong>' + \
-                 ''.join(falseNeg[doc][k].gsTokens) + "</strong></font>" + \
-                 ''.join(falseNeg[doc][k].context[goldMatch[0]+goldMatch[2]+1:])
-            fnContext.append('<td>' + ''.join(fnColorCoded) + '</td>')
+fnFlat = sorted(fnFlat, key=attrgetter('gsLabel'))
+print "fnFlat RIGHT HERE: ", fnFlat
 
+fnContext = ['<html><head></head><body><table>']
+if any(fnFlat):
+    print "******fnFlat[0] : ", fnFlat[0]
+    currLabel = fnFlat[0].gsLabel
+    i = 0
+    while i < len(fnFlat):
+        print "fnFlat[i].gsLabel : ", fnFlat[i].gsLabel, " and ", currLabel
+        if fnFlat[i].gsLabel != currLabel:
+            currLabel = fnFlat[i].gsLabel
+            fnContext.append('<tr><h1>' + currLabel + '</h1></tr>')
+        fnContext.append('<tr>')
+        fnContext.append('<th>' + fnFlat[i].doc + '</th>')
+        fnContext.append('<th>' + fnFlat[i].gsLabel + " wasn't caught </th>")
+        goldMatch = difflib.SequenceMatcher(None, fnFlat[i].context,\
+                                            fnFlat[i].tokens).get_matching_blocks()[0]
+        fnColorCoded = ''.join(fnFlat[i].context[0:goldMatch[0]]) + \
+             '<font style="background-color:yellow"><strong>' + \
+             ''.join(fnFlat[i].tokens) + "</strong></font>" + \
+             ''.join(fnFlat[i].context[goldMatch[0]+goldMatch[2]+1:])
+        fnContext.append('<td>' + ''.join(fnColorCoded) + '</td>')
         fnContext.append('</tr>')
+        i += 1
     fnContext.append('</table></body></html>')
 else:
     fnContext.append('<td> NO FALSE NEGATIVES FOUND! </td></tr></table></body></html>')
@@ -486,6 +493,7 @@ print "dictMatrix: ", dictMatrix
 #'<a href="' + 'confusionMatrix_' + modifierType + ".html#" + label1 + "x" + label2 + '">' + str(val) + '</a>'
 
 # for column in labels[modifierType]:
+#   while i <
 #     matrix[column] = matrix[column].apply(lambda x: '<a href="confusionMatrix_' + modifierType + ".html#" + label1 +
 #        "x" + label2 + '">' + str(val) + '</a>)
 HTML(matrix.to_html(escape=False, index=True, classes='table', buf=os.path.join(path, 'confusionMatrix.html')))
@@ -498,12 +506,15 @@ root = ET.parse(os.path.join(path, 'confusionMatrix.html')).getroot()
 # for thing in ET.tostringlist(root):
 #     print thing
 
-html = ''.join(['<html style="text-align:center;"><head></head><body style="display:inline-block;margin:0px auto;">'] +\
-               ET.tostringlist(root) + ['<br/><p/><iframe seamless="seamless" height="60%" scrolling="yes" \
-               frameborder="0" width="50%" src="' + os.path.join(path, 'cmContext.html') +\
-                                        '"></iframe> <iframe seamless="seamless" height="60%" scrolling="yes"\
-                                         frameborder="0" width="50%" src="' + os.path.join(path, 'fnContext.html') + \
-                                        '"></iframe></body></html>'])
+html = '<html style="text-align:center;"><head></head><body>' +\
+               '<div style="display:inline-block;margin: 0px auto;">' + ET.tostring(root) + '</div>' +\
+               '<br/><p/><div style="width:49%;height:80%;float:left;"><iframe seamless="seamless" scrolling="yes" frameborder="0" src="' +\
+                os.path.join(path, 'cmContext.html') +\
+                '" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe></div>' +\
+                '<div style="width:49%;height:80%;float:left;"><iframe seamless="seamless" scrolling="yes"\
+                 frameborder="0" src="' + os.path.join(path, 'fnContext.html') + \
+                '" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe></div></body></html>'
+
 print "html: ", html
 
 with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
