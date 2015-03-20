@@ -1,6 +1,6 @@
 from xml.dom.minidom import parse
 import os, datetime, sys, re
-from operator import attrgetter, itemgetter
+from operator import attrgetter
 from collections import namedtuple
 import difflib
 import numpy
@@ -12,7 +12,7 @@ from IPython.display import HTML
 ##
 ## Confusion Matrixer for Modifiers and Deid... v2
 ##
-## - Tested on Python 2.7
+## - Tested on Python 2.7.6
 ## - Document tokenization with gaps now handled
 ## - Much quicker on huge sets (tested up to 1000 gold + 1000 eng docs)
 ## - Mim overlap is hinged on a phrase similarity ratio, adjustable around line 270
@@ -23,7 +23,7 @@ startTime = datetime.datetime.now()
 print startTime
 
 # path = sys.argv[1]
-path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTesting"
+path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTestingSub"
 # path = "C:\\Users\\courtney.zelinsky\\Desktop\\chapmanCorpus"
 
 #modifierType = sys.argv[2]
@@ -290,7 +290,7 @@ matrix = matrix.fillna(0)
 
 mismatchFlat = sorted(mismatchFlat, key=attrgetter("gsLabel", "engLabel"))
 
-fpContext = ['<html><head></head><body><table>']
+fpContext = ['<link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css"><head></head><body style="font-family:\'Lato\', sans-serif;"><table>']
 if any(mismatchFlat):
     j = 0
     fpContext.append('<tr><th colspan="3"><font size="18px">' + mismatchFlat[0].gsLabel + " confused as " + mismatchFlat[0].engLabel + '</font></th></tr>')
@@ -318,7 +318,7 @@ if any(mismatchFlat):
 
         if justGs and justEng:
             if mismatchFlat[j].gsEntries[0] < mismatchFlat[j].engEntries[0]:
-                #gold happens first
+                # then gold annotation happens first
                 colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
                                     '<font style="background-color:blue;color:white;"><strong>' + \
                                     ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
@@ -330,6 +330,7 @@ if any(mismatchFlat):
                                     ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
 
             elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
+                # then eng annotation happens first
                 colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
                                     '<font style="background-color:red;color:white;"><strong>' + \
                                     ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) +\
@@ -385,15 +386,7 @@ if any(mismatchFlat):
                                 '</strong></font>' + \
                                 ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
 
-        # colorCodedOutContext = mismatchFp[doc][k].gsTokens[0:begIx] + \
-        #                     ['<font style="background-color:blue;color:white;">'] + \
-        #                     mismatchFp[doc][k].gsTokens[begIx:begIx+engGoldMatch[2]] + ['</font>'] + \
-        #                     mismatchFp[doc][k].gsTokens[begIx+engGoldMatch[2]+1:]
-
         fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
-        #contextOut.append('<td>' + ''.join(colorCodedGsContext) + '</td>')
-        #contextOut.append('<td>' + ''.join(colorCodedEngContext) + '</td>')
-        #contextOut.append('<td>' + ''.join(colorCodedOutContext) + '</td>')
         fpContext.append('</tr>')
         j += 1
     fpContext.append('</table></body></html>')
@@ -405,7 +398,7 @@ fpContext = ''.join(fpContext)
 fnFlat = sorted(fnFlat, key=attrgetter('gsLabel'))
 print "fnFlat RIGHT HERE: ", fnFlat
 
-fnContext = ['<html><head></head><body><table>']
+fnContext = ['<link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css"><head></head><body style="font-family:\'Lato\', sans-serif;"><table>']
 if any(fnFlat):
     print "******fnFlat[0] : ", fnFlat[0]
     fnContext.append('<tr><th colspan="3"><font size="18px">' + fnFlat[0].gsLabel + '</font></th></tr>')
@@ -414,14 +407,14 @@ if any(fnFlat):
         print "fnFlat[i].gsLabel : ", fnFlat[i].gsLabel, " and ", fnFlat[i-1].gsLabel
         if fnFlat[i].gsLabel != fnFlat[i-1].gsLabel and i > 1:
             currLabel = fnFlat[i].gsLabel
-            fnContext.append('<tr id=' + currLabel + '><th><font size="18px">' + currLabel + '</font></th></tr>')
+            fnContext.append('<tr id=' + currLabel + '><th colspan="3"><font size="18px">' + currLabel + '</font></th></tr>')
             print "label got appended"
         fnContext.append('<tr>')
         fnContext.append('<th>' + fnFlat[i].doc + '</th>')
         goldMatch = difflib.SequenceMatcher(None, fnFlat[i].context,\
                                             fnFlat[i].tokens).get_matching_blocks()[0]
         fnColorCoded = ''.join(fnFlat[i].context[0:goldMatch[0]]) + \
-             '<font style="background-color:yellow"><strong>' + \
+             '<font style="background-color:yellow;"><strong>' + \
              ''.join(fnFlat[i].tokens) + "</strong></font>" + \
              ''.join(fnFlat[i].context[goldMatch[0]+goldMatch[2]+1:])
         fnContext.append('<td>' + ''.join(fnColorCoded) + '</td>')
@@ -467,7 +460,7 @@ else:
     remappingNote = '<p><strong> Stats were calculated with remapping OFF - all gold and engine labels have been\
                     counted as is'
 
-html =  '<html style="text-align:center;"><head></head><body>' +\
+html =  '<html style="text-align:center;"><link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css"><head></head><body style="font-family:\'Lato\',sans-serif;">' +\
         '<div style="display:inline-block;margin: 0px auto;">' + ET.tostring(root) + '</div>' +\
         '<br/>' + remappingNote + '<p/>' + \
         '<p><a href="fnContext.html#PRESENT" target="fn"> Also let\'s see if this scrolls </a>' +\
