@@ -113,7 +113,7 @@ def data_to_matrix(matrix, tp, fp, fn):
 def dict_to_html(matrixDict):
 
     #Looks like {'index': [u'PAST', u'RECENTPAST', u'FUTURE', u'PRESENT', u'UNDEFINED'], 'data': [[157.0, 0.0, 0.0, 0.0, 0.0, 108.0, 1.0, 0.5924528301886792, 0.7440758293838862], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, inf, inf, nan], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, inf, inf, nan], [4.0, 0.0, 0.0, 40.0, 0.0, 82.0, 0.9090909090909091, 0.32786885245901637, 0.4819277108433735], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, inf, inf, nan]], 'columns': [u'PAST', u'RECENTPAST', u'FUTURE', u'PRESENT', u'UNDEFINED', 'fn', 'precision', 'recall', 'f-score']}
-    final = ['<div class="table-responsive"><table class="table table-striped"><thead><tr><th></th>' + ''.join('<th>' + column + '</th>' for column in matrixDict['columns']) + '</tr></thead><tbody>']
+    final = ['<div style="padding-top:65px;" id="matrix"><div class="table-responsive"><table class="table table"><thead><tr><th></th>' + ''.join('<th>' + column + '</th>' for column in matrixDict['columns']) + '</tr></thead><tbody>']
 
     y = 0
     while y < len(matrixDict['index']):
@@ -123,17 +123,26 @@ def dict_to_html(matrixDict):
         z = 0
         while z < len(matrixDict['columns']):
             print "z : ", z
-            print "data point: ", matrixDict['data'][y][z]
+            dataPoint = matrixDict['data'][y][z]
             # first five cols of the matrix table
             if z <= 4:
-                value = '<a href="fpContext.html#' + matrixDict['index'][y] + "x" + matrixDict['columns'][z] + '" target="fp">' + str(int(matrixDict['data'][y][z])) + "</a>"
+                value = '<a href="confusionMatrix.html#' + matrixDict['index'][y] + "x" + matrixDict['columns'][z] + '" target="fp">' + str(int(dataPoint)) + "</a>"
             # sixth col is fn
             elif z == 5:
-                value = '<a href="fnContext.html#' + matrixDict['index'][y] + 'xfn" target="fn">' + str(int(matrixDict['data'][y][z])) + "</a>"
+                value = '<a href="confusionMatrix.html#' + matrixDict['index'][y] + 'xfn" target="fn">' + str(int(dataPoint)) + "</a>"
             # no links for the rest
             else:
-                value = str(matrixDict['data'][y][z])
-            final.append('<td>' + value + '</td>')
+                value = dataPoint
+            if dataPoint > 100:
+                final.append('<td style="background-color:#1919ff;color:#337ab7;"><strong>' + str(value) + '</strong></td>')
+            elif 75 < dataPoint <= 100:
+                final.append('<td style="background-color:#4c4cff;color:#337ab7;"><strong>' + str(value) + '</strong></td>')
+            elif 25 < dataPoint <= 75:
+                final.append('<td style="background-color:#9999ff;color:#337ab7;"><strong>' + str(value) + '</strong></td>')
+            elif 0 < dataPoint <= 25:
+                final.append('<td style="background-color:#ccccff;color:#337ab7;"><strong>' + str(value) + '</strong></td>')
+            else:
+                final.append('<td style="background-color:#e5e5ff;color:#337ab7;"><strong>' + str(value) + '</strong></td>')
             z += 1
         final.append('</tr>')
         y += 1
@@ -287,10 +296,9 @@ def main():
     #         confusions[mismatch.gsLabel+mismatch.engLabel] = []
     #     confusions[mismatch.gsLabel+mismatch.engLabel].append(mismatch)
 
+    data_to_matrix(matrix, tpFlat, mismatchFlat, fnFlat)
     matrix = matrix.replace([numpy.inf, -numpy.inf], numpy.nan)
     matrix = matrix.fillna(0)
-
-    data_to_matrix(matrix, tpFlat, mismatchFlat, fnFlat)
     matrixDict = matrix.to_dict(orient="split")
 
     ##
@@ -299,20 +307,20 @@ def main():
 
     mismatchFlat = sorted(mismatchFlat, key=attrgetter("gsLabel", "engLabel"))
 
-    fpContext = ['<html><link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css"><head></head><body style="font-family:\'Lato\', sans-serif;"><table>']
+    fpContext = ['<div class="table-responsive"><h1 style="padding-top:65px;" id="fp">False Positives</h1><table class="table table-striped">']
     if any(mismatchFlat):
         j = 0
-        fpContext.append('<tr id="' + mismatchFlat[0].gsLabel + "x" + mismatchFlat[0].engLabel + '"><th colspan="3"><font size="18px">' + mismatchFlat[0].gsLabel + " confused as " + mismatchFlat[0].engLabel + '</font></th></tr>')
+        fpContext.append('<tr id="' + mismatchFlat[0].gsLabel + "x" + mismatchFlat[0].engLabel + '"><th style="padding-top:65px;">' + mismatchFlat[0].gsLabel + " confused as " + mismatchFlat[0].engLabel + '</th></tr>')
         while j < len(mismatchFlat):
             if mismatchFlat[j].gsLabel != mismatchFlat[j-1].gsLabel and j > 1:
                 currLabel1 = mismatchFlat[j].gsLabel
                 if mismatchFlat[j].engLabel != mismatchFlat[j-1].engLabel and j > 1:
                     currLabel2 = mismatchFlat[j].engLabel
-                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th colspan="3"><font size="18px">' + currLabel1 + " confused as " + currLabel2 + '</font></th></tr>')
+                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</th></tr>')
             elif mismatchFlat[j].engLabel != mismatchFlat[j-1].engLabel and j > 1:
                 currLabel2 = mismatchFlat[j].engLabel
                 currLabel1 = mismatchFlat[j].gsLabel
-                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th colspan="3"><font size="18px">' + currLabel1 + " confused as " + currLabel2 + '</font></th></tr>')
+                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</th></tr>')
 
             fpContext.append('<tr>')
             fpContext.append('<th>' + mismatchFlat[j].doc + '</th>')
@@ -331,9 +339,9 @@ def main():
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
                                         '<font style="background-color:blue;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
+                                        '</strong></font><font style="background-color:green;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:red;color:white;"><strong>' + \
+                                        '</strong></font><font style="background-color:yellow;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
@@ -341,9 +349,9 @@ def main():
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     # ...then eng annotation happens first
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:red;color:white;"><strong>' + \
+                                        '<font style="background-color:yellow;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) +\
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' + \
+                                        '</strong></font><font style="background-color:green;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
@@ -355,14 +363,14 @@ def main():
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
                                         '<font style="background-color:blue;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
+                                        '</strong></font><font style="background-color:green;color:white;"><strong>' +\
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
 
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:purple;color:white;"><strong>' + \
+                                        '<font style="background-color:green;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font><font style="background-color:blue;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
@@ -374,23 +382,23 @@ def main():
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
                                         '<font style="background-color:purple;color:white;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
-                                        '</strong></font><font style="background-color:red;color:white;"><strong>' + \
+                                        '</strong></font><font style="background-color:yellow;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
 
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
-                                        '<font style="background-color:red;color:white;"><strong>' + \
+                                        '<font style="background-color:yellow;"><strong>' + \
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) + \
-                                        '</strong></font><font style="background-color:purple;color:white;"><strong>' +\
+                                        '</strong></font><font style="background-color:green;color:white;"><strong>' +\
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
 
             elif not justEng and not justGs:
                 colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
-                                    '<font style="background-color:purple;color:white;"><strong>' + \
+                                    '<font style="background-color:green;color:white;"><strong>' + \
                                     ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                     '</strong></font>' + \
                                     ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
@@ -398,24 +406,24 @@ def main():
             fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
             fpContext.append('</tr>')
             j += 1
-        fpContext.append('</table></body></html>')
+        fpContext.append('</table></div>')
     else:
-        fpContext.append('<td> NO MISMATCHES FOUND! </td></tr></table></body></html>')
+        fpContext.append('<td> NO MISMATCHES FOUND! </td></tr></table></div>')
 
     fpContext = ''.join(fpContext)
 
     fnFlat = sorted(fnFlat, key=attrgetter('gsLabel'))
     print "fnFlat RIGHT HERE: ", fnFlat
 
-    fnContext = ['<html><link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css"><head></head><body style="font-family:\'Lato\', sans-serif;"><table>']
+    fnContext = ['<div class="table-responsive"><h1 style="padding-top:65px;" id="fn">False Negatives</h1>']
     if any(fnFlat):
-        fnContext.append('<tr id="' + fnFlat[0].gsLabel + 'xfn"><th colspan="3"><font size="18px">' + fnFlat[0].gsLabel + '</font></th></tr>')
+        fnContext.append('<h2 style="padding-top:65px;" id="' + fnFlat[0].gsLabel + 'xfn">' + fnFlat[0].gsLabel + '</h2><table class="table table-striped">')
         i = 0
         while i < len(fnFlat):
             #print "fnFlat[i].gsLabel : ", fnFlat[i].gsLabel, " and ", fnFlat[i-1].gsLabel
             if fnFlat[i].gsLabel != fnFlat[i-1].gsLabel and i > 1:
                 currLabel = fnFlat[i].gsLabel
-                fnContext.append('<tr id="' + currLabel + 'xfn"><th colspan="3"><font size="18px">' + currLabel + '</font></th></tr>')
+                fnContext.append('</table><h2 style="padding-top:65px;" id="' + currLabel + 'xfn"><table class="table table-striped">')
             fnContext.append('<tr>')
             fnContext.append('<th>' + fnFlat[i].doc + '</th>')
             goldMatch = difflib.SequenceMatcher(None, fnFlat[i].context, fnFlat[i].tokens).get_matching_blocks()[0]
@@ -426,9 +434,9 @@ def main():
             fnContext.append('<td>' + ''.join(fnColorCoded) + '</td>')
             fnContext.append('</tr>')
             i += 1
-        fnContext.append('</table></body></html>')
+        fnContext.append('</table></div>')
     else:
-        fnContext.append('<td> NO FALSE NEGATIVES FOUND! </td></tr></table></body></html>')
+        fnContext.append('<td> NO FALSE NEGATIVES FOUND! </td></tr></table></div>')
 
     fnContext = ''.join(fnContext)
 
@@ -436,19 +444,24 @@ def main():
     ## Report Output
     ##
 
-    dict_to_html(matrix.to_dict(orient="split"))
+    dict_to_html(matrixDict)
 
     if remapping is True:
         remappingNote = '<p><strong> Stats were calculated with remapping ON -- any labels in the gold set not in the engine set have been set to their closest engine counterpart. </strong></p>'
     else:
         remappingNote = '<p><strong> Stats were calculated with remapping OFF - all gold and engine labels have been counted as is'
 
-    html =  '<html style="text-align:center;">' +\
-            "<link href='http://fonts.googleapis.com/css?family=Lobster' rel='stylesheet' type='text/css'>" +\
-            '<link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css">' +\
-            '<head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1">' +\
-            '<link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet"></head><body style="font-family:\'Lato\',sans-serif;">' +\
-            """    <nav class="navbar navbar-inverse navbar-fixed-top">
+    html =  """<html style="text-align:center;">
+    <link href='http://fonts.googleapis.com/css?family=Lobster' rel='stylesheet' type='text/css'>
+    <link href="http://fonts.googleapis.com/css?family=Lato:300" rel="stylesheet" type="text/css">
+    <head>
+        <meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="http://getbootstrap.com/examples/dashboard/dashboard.css" rel="stylesheet">
+    </head>
+    <body style="font-family:'Lato',sans-serif;padding-top: 100px;">
+        <nav class="navbar navbar-inverse navbar-fixed-top">
               <div class="container-fluid">
                 <div class="navbar-header">
                   <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
@@ -457,44 +470,74 @@ def main():
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                   </button>
-                  <a class="navbar-brand" href="confusionMatrix.html"><span style="font-family: 'Lobster', cursive;">Confusy.py :</span> A fancy little data visualization script</a>
+                  <a class="navbar-brand" href="confusionMatrix.html"><span style="font-family: 'Lobster', cursive;">Confusy.py :</span> A fancy little data visualization tool</a>
                 </div>
-                <div id="navbar" class="navbar-collapse collapse">
+                <div id="navbar" style="font-family: 'Lobster', cursive;" class="navbar-collapse collapse">
                   <ul class="nav navbar-nav navbar-right">
-                    <li><a href="#">Summary</a></li>
-                    <li><a href="#">Matrix</a></li>
-                    <li><a href="#">Mismatches</a></li>
-                    <li><a href="#">Help</a></li>
-                    <li><a href="#">About</a></li>
+                    <li><a href="#summary">Summary</a></li>
+                    <li><a href="#matrix">Matrix</a></li>
+                    <li><a href="#fp">Mismatches</a></li>
+                    <li><a href="#fn">False Negatives</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#help">Help</a></li>
                   </ul>
                 </div>
               </div>
-            </nav>""" +\
-            '<div style="display:inline-block;margin: 0px auto;margin-top: 100px;">' + dict_to_html(matrixDict) + '</div>' +\
-            '<br/>' + remappingNote + '<p/>' + \
-            '<p><a href="fnContext.html#PRESENTxfn" target="fn"> Also let\'s see if this scrolls </a>' +\
-            '<div style="width:49%;height:80%;float:left;"><iframe name="fp" id="fp" seamless="seamless" scrolling="yes" frameborder="0" src="' +\
-            os.path.join(path, 'fpContext.html') +\
-            '" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe></div>' +\
-            '<div style="width:49%;height:80%;float:left;"><iframe name="fn" id="fn" seamless="seamless" \
-            scrolling="yes" frameborder="0" src="' + os.path.join(path, 'fnContext.html') + \
-            '" style="overflow:hidden;height:100%;width:100%" height="100%" width="100%"></iframe></div>' +\
-            '<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script><script src="../../dist/js/bootstrap.min.js"></script>' +\
-            "<script>$('a').click(function(){$('html, iframe').animate({scrollTop: $( $(this).attr('href') ).offset().top}, 500);return false;});</script></body></html>"
+            </nav>
+                <div class="container-fluid">
+                  <div class="row">
+                    <div class="col-sm-3 col-md-2 sidebar">
+                      <ul class="nav nav-sidebar">
+                        <li class="active"><a href="#summary">Summary <span class="sr-only">(current)</span></a></li>
+                        <li><a href="#matrix">Matrix</a></li>
+                      </ul>
+                      <ul class="nav nav-sidebar">
+                        <li><a href="#fp">Mismatches</a></li>""" +\
+                        ''.join(['<li><a href="confusionMatrix.html#' + label1 + "x" + label2 + '">' + label1 + " x " + label2 + '</a></li>' for label1 in labels[modifierType] for label2 in labels[modifierType]]) + """
+                      </ul>
+                      <ul class="nav nav-sidebar">
+                        <li><a href="#fn">False Negatives</a></li>""" +\
+                        ''.join(['<li><a href="confusionMatrix.html#' + label + "xfn" + '">' + label + '</a></li>' for label in labels[modifierType]]) + """
+                      </ul>
+                    </div>
+                    <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main"><h1 style="padding-top:65px;" id="summary" class="page-header">Summary</h1>
+                        <div class="row placeholders">
+                            <div class="col-xs-6 col-sm-3 placeholder">
+                              <img data-src="holder.js/200x200/auto/sky" class="img-responsive" alt="Generic placeholder thumbnail">
+                              <h4>Label</h4>
+                              <span class="text-muted">Something else</span>
+                            </div>
+                            <div class="col-xs-6 col-sm-3 placeholder">
+                              <img data-src="holder.js/200x200/auto/vine" class="img-responsive" alt="Generic placeholder thumbnail">
+                              <h4>Label</h4>
+                              <span class="text-muted">Something else</span>
+                            </div>
+                            <div class="col-xs-6 col-sm-3 placeholder">
+                              <img data-src="holder.js/200x200/auto/sky" class="img-responsive" alt="Generic placeholder thumbnail">
+                              <h4>Label</h4>
+                              <span class="text-muted">Something else</span>
+                            </div>
+                            <div class="col-xs-6 col-sm-3 placeholder">
+                              <img data-src="holder.js/200x200/auto/vine" class="img-responsive" alt="Generic placeholder thumbnail">
+                              <h4>Label</h4>
+                              <span class="text-muted">Something else</span>
+                            </div>
+                          </div>""" +  dict_to_html(matrixDict) + '<br/>' + remappingNote + '<p/>' + fpContext + fnContext +\
+                        """</div>
+                      </div>
+                    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+    <script src="../../dist/js/bootstrap.min.js"></script>
+    <script>$('a').click(function(){$('html, body').animate({scrollTop: $( $(this).attr('href') ).offset().top}, 500);return false;});</script>
+    <script> $(function(){$('.nav li a').on('click', function(e){ e.preventDefault(); var $thisLi = $(this).parent('li'); var $ul = $thisLi.parent('ul'); var $thisDiv = $ul.parent('div'); if (!$thisLi.hasClass('active')) { $thisDiv.find('li.active').removeClass('active'); $thisLi.addClass('active'); }})}) </script>
+</body>
+</html>"""
 
     print "html: ", html
 
     with open(os.path.join(path, 'confusionMatrix.html'), 'w') as out:
         out.write(html)
     out.close()
-
-    with open(os.path.join(path, 'fpContext.html'), 'w') as outFrame:
-        outFrame.write(fpContext)
-    outFrame.close()
-
-    with open(os.path.join(path, 'fnContext.html'), 'w') as outFn:
-        outFn.write(fnContext)
-    outFn.close()
 
     print matrix
 
