@@ -21,10 +21,17 @@ import difflib
 ## "Remapping?"
 ## - say "True" to map non-engine gold labels to the closest engine counterparts, otherwise say "False"
 ##
+##
 ## Faults of this script / ways it can be improved:
+##
 ## - narrativeBinding @ref nodes in CDA aren't often in sorted order. The below should obviously be 's/p Endovascular Aortic Aneurysm Repair'
 ##  e.g. Mim(entries=[4, 5, 6, 7, 8, 401, 402], tokens=[u's ', u'Endovascular ', u'Aortic ', u'Aneurysm ', u'Repair.  ', u'/ ', u'p '], label=u'PAST')
 ##  This should be easily fixed with tokenizeOldXslt.py though, which takes weirdo tokenization and, preserving MIM bindings, reassigns @ref / @IDs in order
+##
+## - do take the contents of the spontFp (non-mismatch false positives) dictionary and show them in another table of concordances
+##
+## - add some pretty graphs at the top!
+##
 
 
 def is_namedtuple_instance(x):
@@ -62,7 +69,7 @@ def process_entries(mimDict, doc, entries, remapping, texts, typeLabels):
 
     # If you're having problems pulling these, check that MIM in the xml is either a scope or term annotation type
     mimChildren = [entry.firstChild for entry in entries\
-                   if (entry.firstChild.localName == 'scope' or entry.firstChild.localName == 'term')]
+                   if entry.firstChild.localName == ('scope' or 'term' or 'deid')]
 
     for child in mimChildren:
         entries = sorted(int(binding.getAttribute('ref').split('_')[1]) for binding in child.getElementsByTagNameNS('*', 'narrativeBinding'))
@@ -81,7 +88,7 @@ def process_entries(mimDict, doc, entries, remapping, texts, typeLabels):
                     else:
                         mimDict[doc].append(Mim(entries, [re.sub(r'\n', ' ', texts[doc][i]) for i in entries], label))
             else:
-                mimDict.append(Mim(entries, [re.sub(r'\n', ' ', texts[doc][i]) for i in entries], label))
+                mimDict[doc].append(Mim(entries, [re.sub(r'\n', ' ', texts[doc][i]) for i in entries], label))
         del entries
         del label
     del mimChildren
@@ -162,16 +169,18 @@ def main():
     ##
 
     # path = sys.argv[1]
-    path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTestingSub"
+    # path = "C:\Users\courtney.zelinsky\Desktop\Junk\deid"
+    path = "C:\\Users\\courtney.zelinsky\\Desktop\\temporalityTesting"
     # path = "C:\\Users\\courtney.zelinsky\\Desktop\\chapmanCorpus"
 
     #modifierType = sys.argv[2]
     modifierType = 'T'
+    # modifierType = 'D'
     # modifierType = 'i2b2'
 
     # print "Remapping? Enter True or False"
     # remapping = raw_input()
-    remapping = True
+    remapping = False
 
     if not os.path.exists(path):
         raise Exception('Invalid path(s)')
@@ -222,6 +231,7 @@ def main():
         texts[doc] = {}
         goldParsed = parse(os.path.join(path, doc))
         for contentNode in goldParsed.getElementsByTagNameNS('*', 'content'):
+            #print etree.tostring(contentNode)
             getTokenization = int(contentNode.getAttribute('ID').split('_')[1])
             texts[doc][getTokenization] = contentNode.firstChild.nodeValue
 
@@ -307,20 +317,29 @@ def main():
 
     mismatchFlat = sorted(mismatchFlat, key=attrgetter("gsLabel", "engLabel"))
 
-    fpContext = ['<div class="table-responsive"><h1 style="padding-top:65px;" id="fp">False Positives</h1><table class="table table-striped">']
+    mismatchConfusionTypes = []
+    fnConfusionTypes = []
+
+    fpContext = ['<div class="table-responsive"><h1 style="padding-top:65px;" id="fp">False Positives</h1>']
     if any(mismatchFlat):
         j = 0
-        fpContext.append('<tr id="' + mismatchFlat[0].gsLabel + "x" + mismatchFlat[0].engLabel + '"><th style="padding-top:65px;">' + mismatchFlat[0].gsLabel + " confused as " + mismatchFlat[0].engLabel + '</th></tr>')
+        fpContext.append('<h2 id="' + mismatchFlat[0].gsLabel + "x" + mismatchFlat[0].engLabel + '" style="padding-top:65px;">' + mismatchFlat[0].gsLabel + " confused as " + mismatchFlat[0].engLabel + '</h2><table class="table table-striped">')
+        if mismatchFlat[0].gsLabel +"x"+ mismatchFlat[0].engLabel not in mismatchConfusionTypes:
+            mismatchConfusionTypes.append(mismatchFlat[0].gsLabel +"x"+ mismatchFlat[0].engLabel)
         while j < len(mismatchFlat):
             if mismatchFlat[j].gsLabel != mismatchFlat[j-1].gsLabel and j > 1:
                 currLabel1 = mismatchFlat[j].gsLabel
                 if mismatchFlat[j].engLabel != mismatchFlat[j-1].engLabel and j > 1:
                     currLabel2 = mismatchFlat[j].engLabel
-                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</th></tr>')
+                fpContext.append('</table><h2 id="' + currLabel1 + "x" + currLabel2 + '" style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</h2><table class="table table-striped">')
+                if currLabel1 + "x" + currLabel2 not in mismatchConfusionTypes:
+                    mismatchConfusionTypes.append(currLabel1 + "x" + currLabel2)
             elif mismatchFlat[j].engLabel != mismatchFlat[j-1].engLabel and j > 1:
                 currLabel2 = mismatchFlat[j].engLabel
                 currLabel1 = mismatchFlat[j].gsLabel
-                fpContext.append('<tr id="' + currLabel1 + "x" + currLabel2 + '"><th style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</th></tr>')
+                fpContext.append('</table><h2 id="' + currLabel1 + "x" + currLabel2 + '" style="padding-top:65px;">' + currLabel1 + " confused as " + currLabel2 + '</h2><table class="table table-striped">')
+                if currLabel1 + "x" + currLabel2 not in mismatchConfusionTypes:
+                    mismatchConfusionTypes.append(currLabel1 + "x" + currLabel2)
 
             fpContext.append('<tr>')
             fpContext.append('<th>' + mismatchFlat[j].doc + '</th>')
@@ -345,6 +364,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     # ...then eng annotation happens first
@@ -357,6 +377,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
             if justGs and not justEng:
                 if mismatchFlat[j].gsEntries[0] < mismatchFlat[j].engEntries[0]:
@@ -367,6 +388,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
@@ -376,6 +398,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
             elif justEng and not justGs:
                 if mismatchFlat[j].gsEntries[0] < mismatchFlat[j].engEntries[0]:
@@ -386,6 +409,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(justEng))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
                 elif mismatchFlat[j].gsEntries[0] > mismatchFlat[j].engEntries[0]:
                     colorCodedContext = ''.join(mismatchFlat[j].context[0:engMatch[0]]) + \
@@ -395,6 +419,7 @@ def main():
                                         ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                         '</strong></font>' + \
                                         ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                    fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
             elif not justEng and not justGs:
                 colorCodedContext = ''.join(mismatchFlat[j].context[0:goldMatch[0]]) + \
@@ -402,8 +427,8 @@ def main():
                                     ''.join([texts[mismatchFlat[j].doc][n] for n in sorted(list(intrscEngGs))]) + \
                                     '</strong></font>' + \
                                     ''.join(mismatchFlat[j].context[goldMatch[0]+goldMatch[2]+1:])
+                fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
 
-            fpContext.append('<td>' + ''.join(colorCodedContext) + '</td>')
             fpContext.append('</tr>')
             j += 1
         fpContext.append('</table></div>')
@@ -418,12 +443,16 @@ def main():
     fnContext = ['<div class="table-responsive"><h1 style="padding-top:65px;" id="fn">False Negatives</h1>']
     if any(fnFlat):
         fnContext.append('<h2 style="padding-top:65px;" id="' + fnFlat[0].gsLabel + 'xfn">' + fnFlat[0].gsLabel + '</h2><table class="table table-striped">')
+        if fnFlat[0].gsLabel not in fnConfusionTypes:
+            fnConfusionTypes.append(fnFlat[0].gsLabel)
         i = 0
         while i < len(fnFlat):
             #print "fnFlat[i].gsLabel : ", fnFlat[i].gsLabel, " and ", fnFlat[i-1].gsLabel
             if fnFlat[i].gsLabel != fnFlat[i-1].gsLabel and i > 1:
                 currLabel = fnFlat[i].gsLabel
-                fnContext.append('</table><h2 style="padding-top:65px;" id="' + currLabel + 'xfn"><table class="table table-striped">')
+                fnContext.append('</table><h2 style="padding-top:65px;" id="' + currLabel + 'xfn">' + currLabel + '</h2><table class="table table-striped">')
+                if fnFlat[0].gsLabel not in fnConfusionTypes:
+                    fnConfusionTypes.append(currLabel)
             fnContext.append('<tr>')
             fnContext.append('<th>' + fnFlat[i].doc + '</th>')
             goldMatch = difflib.SequenceMatcher(None, fnFlat[i].context, fnFlat[i].tokens).get_matching_blocks()[0]
@@ -446,6 +475,9 @@ def main():
 
     dict_to_html(matrixDict)
 
+    # max_fn = matrix.groupby()['fn'].max()
+    # min_fn = matrix.ix[matrix['fn'].idxmin()]
+
     if remapping is True:
         remappingNote = '<p><strong> Stats were calculated with remapping ON -- any labels in the gold set not in the engine set have been set to their closest engine counterpart. </strong></p>'
     else:
@@ -457,7 +489,9 @@ def main():
     <head>
         <meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script type="text/javascript" src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
         <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+        <script src="https://raw.githubusercontent.com/benkeen/d3pie/0.1.6/d3pie/d3pie.min.js"></script>
         <link href="http://getbootstrap.com/examples/dashboard/dashboard.css" rel="stylesheet">
     </head>
     <body style="font-family:'Lato',sans-serif;padding-top: 100px;">
@@ -479,7 +513,6 @@ def main():
                     <li><a href="#fp">Mismatches</a></li>
                     <li><a href="#fn">False Negatives</a></li>
                     <li><a href="#about">About</a></li>
-                    <li><a href="#help">Help</a></li>
                   </ul>
                 </div>
               </div>
@@ -493,43 +526,111 @@ def main():
                       </ul>
                       <ul class="nav nav-sidebar">
                         <li><a href="#fp">Mismatches</a></li>""" +\
-                        ''.join(['<li><a href="confusionMatrix.html#' + label1 + "x" + label2 + '">' + label1 + " x " + label2 + '</a></li>' for label1 in labels[modifierType] for label2 in labels[modifierType]]) + """
+                        ''.join(['<li><a href="confusionMatrix.html#' + mismatch + '">' + mismatch + '</a></li>' for mismatch in mismatchConfusionTypes]) + """
                       </ul>
                       <ul class="nav nav-sidebar">
                         <li><a href="#fn">False Negatives</a></li>""" +\
-                        ''.join(['<li><a href="confusionMatrix.html#' + label + "xfn" + '">' + label + '</a></li>' for label in labels[modifierType]]) + """
+                        ''.join(['<li><a href="confusionMatrix.html#' + fn + "xfn" + '">' + fn + '</a></li>' for fn in fnConfusionTypes]) + """
                       </ul>
                     </div>
                     <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main"><h1 style="padding-top:65px;" id="summary" class="page-header">Summary</h1>
                         <div class="row placeholders">
                             <div class="col-xs-6 col-sm-3 placeholder">
-                              <img data-src="holder.js/200x200/auto/sky" class="img-responsive" alt="Generic placeholder thumbnail">
-                              <h4>Label</h4>
-                              <span class="text-muted">Something else</span>
+                            <div id="pie1"></div>
+                              <h4>Best Mismatch Category</h4>
+                              <span class="text-muted">RECENTPAST x PRESENT</span>
                             </div>
                             <div class="col-xs-6 col-sm-3 placeholder">
-                              <img data-src="holder.js/200x200/auto/vine" class="img-responsive" alt="Generic placeholder thumbnail">
-                              <h4>Label</h4>
-                              <span class="text-muted">Something else</span>
+                            <div id="pie2"></div>
+                              <h4>Worst Mismatch Category</h4>
+                              <span class="text-muted">RECENTPAST x PAST</span>
                             </div>
                             <div class="col-xs-6 col-sm-3 placeholder">
-                              <img data-src="holder.js/200x200/auto/sky" class="img-responsive" alt="Generic placeholder thumbnail">
-                              <h4>Label</h4>
-                              <span class="text-muted">Something else</span>
+                            <div id="pie3"></div>
+                              <h4>Best False Negative Category</h4>
+                              <span class="text-muted">FUTURE</span>
                             </div>
                             <div class="col-xs-6 col-sm-3 placeholder">
-                              <img data-src="holder.js/200x200/auto/vine" class="img-responsive" alt="Generic placeholder thumbnail">
-                              <h4>Label</h4>
-                              <span class="text-muted">Something else</span>
+                            <div id="pie4"></div>
+
+                              <h4>Worst False Negative Category</h4>
+                              <span class="text-muted">PAST</span>
                             </div>
                           </div>""" +  dict_to_html(matrixDict) + '<br/>' + remappingNote + '<p/>' + fpContext + fnContext +\
-                        """</div>
+                        """<div id="about"> <img src="http://chapter11dallas.com/wp-content/uploads/2014/03/logo_mmodal_fluency.jpg"/>
+                        <p>Developed by Courtney Zelinsky for M*Modal (cmzelinsky@gmail.com for any questions or comments)</p>
+                        </div></div>
                       </div>
                     </div>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
     <script src="../../dist/js/bootstrap.min.js"></script>
     <script>$('a').click(function(){$('html, body').animate({scrollTop: $( $(this).attr('href') ).offset().top}, 500);return false;});</script>
     <script> $(function(){$('.nav li a').on('click', function(e){ e.preventDefault(); var $thisLi = $(this).parent('li'); var $ul = $thisLi.parent('ul'); var $thisDiv = $ul.parent('div'); if (!$thisLi.hasClass('active')) { $thisDiv.find('li.active').removeClass('active'); $thisLi.addClass('active'); }})}) </script>
+    <script>
+    var pie2 = new d3pie("pie2", {
+    header: {
+        title: {
+            text: "Best mismatch"
+        }
+    },
+    data: {
+        content: [
+            { label: "JavaScript", value: 264131 },
+            { label: "Ruby", value: 218812 },
+            { label: "Java", value: 157618},
+        ]
+    }
+    });
+  </script>
+  <script>
+    var pie3 = new d3pie("pie3", {
+    header: {
+        title: {
+            text: "Best mismatch"
+        }
+    },
+    data: {
+        content: [
+            { label: "JavaScript", value: 264131 },
+            { label: "Ruby", value: 218812 },
+            { label: "Java", value: 157618},
+        ]
+    }
+    });
+  </script>
+  <script>
+    var pie4 = new d3pie("pie4", {
+    header: {
+        title: {
+            text: "Best mismatch"
+        }
+    },
+    data: {
+        content: [
+            { label: "JavaScript", value: 264131 },
+            { label: "Ruby", value: 218812 },
+            { label: "Java", value: 157618},
+        ]
+    }
+    });
+  </script>
+    <script>
+    var pie1 = new d3pie("pie1", {
+    header: {
+        title: {
+            text: "Best mismatch"
+        }
+    },
+    data: {
+        content: [
+            { label: "JavaScript", value: 264131 },
+            { label: "Ruby", value: 218812 },
+            { label: "Java", value: 157618},
+        ]
+    }
+    });
+  </script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.js"></script>
 </body>
 </html>"""
 
@@ -540,6 +641,10 @@ def main():
     out.close()
 
     print matrix
+
+    # print "max fn", max_fn
+    #
+    # print "min fn", min_fn
 
     print "\n\nTook ", datetime.datetime.now()-startTime, " to run ", len(goldDocs), " files."
 
